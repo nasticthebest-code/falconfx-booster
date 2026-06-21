@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FalconFX — Booster Command Centre</title>
+<style>
+  :root {
+    --bg:        #080b10;
+    --surface:   #0d1117;
+    --border:    #1e2a35;
+    --accent:    #00ffe7;
+    --accent2:   #00b8ff;
+    --warn:      #ffa500;
+    --danger:    #ff4444;
+    --success:   #39ff6e;
+    --text:      #c9d1d9;
+    --muted:     #586069;
+    --panel:     #0e161e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(90deg, #030608 0%, #0a1520 50%, #030608 100%);
+    border-bottom: 1px solid var(--accent);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 0 20px rgba(0,255,231,0.12);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+    box-shadow: 0 0 14px var(--accent);
+  }
+  .logo h1 {
+    font-size: 17px;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--accent);
+  }
+  .logo sub { font-size: 10px; color: var(--muted); display: block; letter-spacing: 1px; }
+  .header-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--muted);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── LAYOUT ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 57px);
+  }
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    overflow-y: auto;
+  }
+  main {
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 18px;
+    overflow-y: auto;
+  }
+
+  /* ── NAV ── */
+  nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: all .2s;
+    border: 1px solid transparent;
+  }
+  nav a:hover { color: var(--text); background: rgba(0,255,231,0.04); }
+  nav a.active {
+    color: var(--accent);
+    background: rgba(0,255,231,0.08);
+    border-color: rgba(0,255,231,0.2);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-icon { font-size: 14px; }
+  .nav-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ── PANELS ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,255,231,0.03);
+  }
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  .panel-body { padding: 16px; }
+
+  /* ── METRIC CARDS ── */
+  .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .metric:hover { border-color: var(--accent2); }
+  .metric::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,255,231,0.04) 0%, transparent 60%);
+  }
+  .metric-label { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+  .metric-value { font-size: 26px; font-weight: bold; color: var(--accent); margin: 4px 0 2px; text-shadow: 0 0 12px rgba(0,255,231,0.4); }
+  .metric-sub { font-size: 10px; color: var(--muted); }
+  .metric.ok .metric-value  { color: var(--success); text-shadow: 0 0 10px rgba(57,255,110,0.4); }
+  .metric.warn .metric-value { color: var(--warn);    text-shadow: 0 0 10px rgba(255,165,0,0.4); }
+  .metric.err .metric-value  { color: var(--danger);  text-shadow: 0 0 10px rgba(255,68,68,0.4); }
+
+  /* ── GUARDS ── */
+  .guards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .guard-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: all .2s;
+  }
+  .guard-card.on  { border-color: rgba(57,255,110,0.35); background: rgba(57,255,110,0.04); }
+  .guard-card.off { border-color: rgba(255,68,68,0.35);  background: rgba(255,68,68,0.04);  opacity:.7; }
+  .guard-info { flex: 1; }
+  .guard-name { font-size: 13px; font-weight: bold; color: var(--text); }
+  .guard-desc { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .guard-badge {
+    font-size: 9px; letter-spacing: 1px; padding: 2px 7px; border-radius: 3px;
+    font-weight: bold; margin-top: 5px; display: inline-block;
+  }
+  .badge-on  { background: rgba(57,255,110,0.15); color: var(--success); border: 1px solid var(--success); }
+  .badge-off { background: rgba(255,68,68,0.15);  color: var(--danger);  border: 1px solid var(--danger); }
+
+  /* ── TOGGLE SWITCH ── */
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; margin-left: 12px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer;
+    inset: 0; border-radius: 24px;
+    background: rgba(255,68,68,0.3);
+    transition: .3s;
+    border: 1px solid var(--border);
+  }
+  .slider:before {
+    content: '';
+    position: absolute; height: 16px; width: 16px;
+    left: 3px; bottom: 3px; border-radius: 50%;
+    background: var(--danger);
+    transition: .3s;
+    box-shadow: 0 0 6px var(--danger);
+  }
+  .toggle input:checked + .slider { background: rgba(57,255,110,0.2); border-color: var(--success); }
+  .toggle input:checked + .slider:before {
+    transform: translateX(20px);
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+  }
+
+  /* ── SLIDERS ── */
+  .sliders-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .slider-row { display: flex; flex-direction: column; gap: 6px; }
+  .slider-label {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); letter-spacing: .5px;
+  }
+  .slider-val { color: var(--accent); font-weight: bold; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 6px var(--accent); cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--pct, 50%), var(--border) var(--pct, 50%));
+    border-radius: 2px; height: 4px;
+  }
+
+  /* ── INGEST BOX ── */
+  textarea {
+    width: 100%; height: 180px;
+    background: #060b10;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color .2s;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 8px rgba(0,255,231,0.1); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: 5px;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    letter-spacing: 1px; font-weight: bold;
+    cursor: pointer; border: none; outline: none;
+    transition: all .2s;
+  }
+  .btn-primary {
+    background: rgba(0,255,231,0.1);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn-primary:hover { background: rgba(0,255,231,0.18); box-shadow: 0 0 12px rgba(0,255,231,0.2); }
+  .btn-danger  { background: rgba(255,68,68,0.1); color: var(--danger); border: 1px solid var(--danger); }
+  .btn-success { background: rgba(57,255,110,0.1); color: var(--success); border: 1px solid var(--success); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── LOG / OUTPUT ── */
+  .log-box {
+    background: #050809;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 11px;
+    max-height: 180px;
+    overflow-y: auto;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .log-box .ok   { color: var(--success); }
+  .log-box .warn { color: var(--warn);    }
+  .log-box .err  { color: var(--danger);  }
+  .log-box .info { color: var(--accent2); }
+
+  /* ── HEALTH ROW ── */
+  .health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .health-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .health-key  { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .health-val  { font-size: 13px; color: var(--text); margin-top: 4px; word-break: break-all; }
+  .health-val.ok  { color: var(--success); }
+  .health-val.err { color: var(--danger); }
+
+  /* ── SHADOW MATRIX TABLE ── */
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { text-align: left; padding: 6px 10px; color: var(--muted); letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  td { padding: 6px 10px; border-bottom: 1px solid rgba(30,42,53,0.5); }
+  tr:hover td { background: rgba(0,255,231,0.03); }
+  .badge-active   { background: rgba(57,255,110,0.15);  color: var(--success); font-size: 9px; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; }
+  .badge-inactive { background: rgba(88,96,105,0.15);   color: var(--muted);   font-size: 9px; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; }
+
+  /* ── SAVE BAR ── */
+  .save-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .save-bar span { font-size: 10px; color: var(--muted); }
+
+  /* ── SECTIONS ── */
+  .section-hidden { display: none; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    aside { flex-direction: row; flex-wrap: wrap; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .metrics-row, .guards-grid, .sliders-grid, .health-grid { grid-template-columns: repeat(2,1fr); }
+  }
+  @media (max-width: 600px) {
+    .metrics-row, .guards-grid, .sliders-grid, .health-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <h1>FALCONFX</h1>
+      <sub>BOOSTER ENGINE v4.0 — COMMAND CENTRE</sub>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="dot live" id="statusDot"></div>
+    <span id="statusText">CONNECTING...</span>
+    <span style="margin-left:16px; color:var(--muted)" id="clockEl"></span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- SIDEBAR NAV -->
+  <aside>
+    <nav>
+      <a class="active" data-sec="metrics" onclick="showSection('metrics',this)">
+        <span class="nav-icon">◈</span> LIVE METRICS
+      </a>
+      <a data-sec="guards" onclick="showSection('guards',this)">
+        <span class="nav-icon">⚡</span> INTELLIGENCE GUARDS
+      </a>
+      <a data-sec="params" onclick="showSection('params',this)">
+        <span class="nav-icon">⚙</span> ROUTING PARAMS
+      </a>
+      <a data-sec="ingest" onclick="showSection('ingest',this)">
+        <span class="nav-icon">⬆</span> DATA INGEST
+      </a>
+      <a data-sec="shadow" onclick="showSection('shadow',this)">
+        <span class="nav-icon">⬡</span> SHADOW MATRIX
+      </a>
+      <a data-sec="telemetry" onclick="showSection('telemetry',this);loadTelemetry()">
+        <span class="nav-icon">◉</span> MATCH TELEMETRY
+      </a>
+      <hr class="nav-sep">
+      <a onclick="refreshHealth()" style="cursor:pointer">
+        <span class="nav-icon">↻</span> REFRESH
+      </a>
+    </nav>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- ══ SECTION: LIVE METRICS ════════════════════════════════════════════ -->
+    <div id="sec-metrics">
+
+      <div class="metrics-row" id="metricCards">
+        <div class="metric" id="mc-pois">
+          <div class="metric-label">INDEXED POIs</div>
+          <div class="metric-value" id="m-pois">—</div>
+          <div class="metric-sub">OpenStreetMap + Ground Truth</div>
+        </div>
+        <div class="metric" id="mc-cells">
+          <div class="metric-label">GRID CELLS</div>
+          <div class="metric-value" id="m-cells">—</div>
+          <div class="metric-sub">~110m resolution</div>
+        </div>
+        <div class="metric ok" id="mc-status">
+          <div class="metric-label">ENGINE STATUS</div>
+          <div class="metric-value" id="m-status">—</div>
+          <div class="metric-sub" id="m-status-sub">loading…</div>
+        </div>
+        <div class="metric" id="mc-shadow">
+          <div class="metric-label">SHADOW ZONES</div>
+          <div class="metric-value" id="m-shadow">—</div>
+          <div class="metric-sub">Offline demand matrices</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:0">
+        <div class="panel-header">
+          <span class="panel-title">SERVER HEALTH</span>
+          <span style="font-size:10px;color:var(--muted)" id="lastRefresh">never</span>
+        </div>
+        <div class="panel-body">
+          <div class="health-grid" id="healthGrid">
+            <div class="health-item"><div class="health-key">VERSION</div><div class="health-val" id="hv-version">—</div></div>
+            <div class="health-item"><div class="health-key">ALGORITHM</div><div class="health-val" id="hv-algo">—</div></div>
+            <div class="health-item"><div class="health-key">ROAD QUALITY ZONES</div><div class="health-val" id="hv-road">—</div></div>
+            <div class="health-item"><div class="health-key">B2B WHOLESALE ZONES</div><div class="health-val" id="hv-b2b">—</div></div>
+            <div class="health-item"><div class="health-key">TERMINAL SCHEDULES</div><div class="health-val" id="hv-term">—</div></div>
+            <div class="health-item"><div class="health-key">TIMESTAMP</div><div class="health-val" id="hv-ts">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">QUICK COMPUTE — RIDER PROBE</span>
+          <button class="btn btn-primary" onclick="runProbe()" id="probeBtn">▶ RUN PROBE</button>
+        </div>
+        <div class="panel-body">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+            <div>
+              <div class="slider-label"><span>LAT</span></div>
+              <input type="number" id="probe-lat" value="5.605" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+            <div>
+              <div class="slider-label"><span>LNG</span></div>
+              <input type="number" id="probe-lng" value="-0.173" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+            <div>
+              <div class="slider-label"><span>SPEED (km/h)</span></div>
+              <input type="number" id="probe-spd" value="28" min="0" max="120" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+            <div>
+              <div class="slider-label"><span>HEADING (°)</span></div>
+              <input type="number" id="probe-hdg" value="135" min="0" max="359" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+          </div>
+          <div class="log-box" id="probeOutput">
+            <span class="info">// probe output will appear here</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION: INTELLIGENCE GUARDS ═══════════════════════════════════ -->
+    <div id="sec-guards" class="section-hidden">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">INTELLIGENCE GUARDS — RUNTIME CONTROL</span>
+          <button class="btn btn-primary" onclick="saveGuards()">💾 APPLY</button>
+        </div>
+        <div class="panel-body">
+          <p style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.7">
+            Toggle the four core intelligence gates. Changes take effect on next compute cycle.
+            Disabling a guard removes its score adjustment from the demand pipeline.
+          </p>
+          <div class="guards-grid" id="guardsGrid">
+            <div class="guard-card on" id="gc-ghost">
+              <div class="guard-info">
+                <div class="guard-name">⚡ GHOST PENALTY</div>
+                <div class="guard-desc">score ≥ 85, velocity &lt; 8.0 → 75% haircut.<br>Prevents chasing already-peaked dead zones.</div>
+                <span class="guard-badge badge-on" id="gb-ghost">ACTIVE</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="t-ghost" checked onchange="updateGuardCard('ghost')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="guard-card on" id="gc-cashcow">
+              <div class="guard-info">
+                <div class="guard-name">💰 CASH COW GUARD</div>
+                <div class="guard-desc">score ≥ 85, velocity ≥ 8.0 → NO haircut.<br>Zone still printing money — stay or re-enter.</div>
+                <span class="guard-badge badge-on" id="gb-cashcow">ACTIVE</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="t-cashcow" checked onchange="updateGuardCard('cashcow')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="guard-card on" id="gc-megachurch">
+              <div class="guard-info">
+                <div class="guard-name">⛪ MEGA-CHURCH WAVES</div>
+                <div class="guard-desc">Perez Dome / Action Chapel / ICGC / BlackStar.<br>Synchronized dismissal demand spikes.</div>
+                <span class="guard-badge badge-on" id="gb-megachurch">ACTIVE</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="t-megachurch" checked onchange="updateGuardCard('megachurch')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="guard-card on" id="gc-corparb">
+              <div class="guard-info">
+                <div class="guard-name">🏢 CORP ARBITRAGE ROUTER</div>
+                <div class="guard-desc">Legal Push 10:00–11:30 + Pre-COB 15:30–17:00.<br>Gate+walk+lift overhead baked into net yield.</div>
+                <span class="guard-badge badge-on" id="gb-corparb">ACTIVE</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="t-corparb" checked onchange="updateGuardCard('corparb')">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div id="guardsLog" class="log-box" style="margin-top:14px">
+            <span class="info">// guard changes will be logged here</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION: ROUTING PARAMS ════════════════════════════════════════ -->
+    <div id="sec-params" class="section-hidden">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">ROUTING PARAMETERS — LIVE TUNING</span>
+        </div>
+        <div class="panel-body">
+          <div class="sliders-grid">
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>VELOCITY STABLE THRESHOLD</span>
+                <span class="slider-val" id="lv-vst">8.0</span>
+              </div>
+              <input type="range" id="s-vst" min="2" max="20" step="0.5" value="8"
+                oninput="updSlider('vst',this.value)"
+                style="--pct:30%">
+              <div class="slider-label"><span style="font-size:9px">Cash Cow Guard boundary — higher = fewer cash cows recognised</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>GHOST SCORE THRESHOLD</span>
+                <span class="slider-val" id="lv-gst">85</span>
+              </div>
+              <input type="range" id="s-gst" min="60" max="98" step="1" value="85"
+                oninput="updSlider('gst',this.value)"
+                style="--pct:52%">
+              <div class="slider-label"><span style="font-size:9px">Score above which Ghost Penalty applies</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>MIN PROFIT THRESHOLD (GHS)</span>
+                <span class="slider-val" id="lv-mpt">4.00</span>
+              </div>
+              <input type="range" id="s-mpt" min="1" max="15" step="0.5" value="4"
+                oninput="updSlider('mpt',this.value)"
+                style="--pct:20%">
+              <div class="slider-label"><span style="font-size:9px">Net yield below this triggers HOLD</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>FUEL COST (GHS / km)</span>
+                <span class="slider-val" id="lv-fc">1.80</span>
+              </div>
+              <input type="range" id="s-fc" min="0.5" max="4" step="0.1" value="1.8"
+                oninput="updSlider('fc',this.value)"
+                style="--pct:37%">
+              <div class="slider-label"><span style="font-size:9px">Petrol-equivalent for motorbike per km</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>SEARCH RADIUS (km)</span>
+                <span class="slider-val" id="lv-sr">5.0</span>
+              </div>
+              <input type="range" id="s-sr" min="1" max="20" step="0.5" value="5"
+                oninput="updSlider('sr',this.value)"
+                style="--pct:22%">
+              <div class="slider-label"><span style="font-size:9px">Candidate hotspot search radius per compute</span></div>
+            </div>
+            <div class="slider-row">
+              <div class="slider-label">
+                <span>GHOST MULTIPLIER</span>
+                <span class="slider-val" id="lv-gm">0.25</span>
+              </div>
+              <input type="range" id="s-gm" min="0.05" max="0.9" step="0.05" value="0.25"
+                oninput="updSlider('gm',this.value)"
+                style="--pct:22%">
+              <div class="slider-label"><span style="font-size:9px">Score multiplier for fading ghost zones (0.25 = 75% cut)</span></div>
+            </div>
+          </div>
+          <div class="save-bar">
+            <span id="paramsStatus">Params reflect last applied values.</span>
+            <button class="btn btn-primary" onclick="saveParams()">💾 APPLY PARAMS</button>
+          </div>
+          <div id="paramsLog" class="log-box" style="margin-top:14px">
+            <span class="info">// param changes will be logged here</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION: DATA INGEST ═══════════════════════════════════════════ -->
+    <div id="sec-ingest" class="section-hidden">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">RAW DATA INGEST — PERPLEXITY / GROUND TRUTH</span>
+        </div>
+        <div class="panel-body">
+          <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+            Paste raw text data below. The engine will parse place names, strip duplicates using the
+            <strong style="color:var(--accent)">20-metre proximity guard</strong>, and append verified
+            entries to the active POI database.
+          </p>
+          <textarea id="ingestBox" placeholder="Paste raw text here...
+
+Examples:
+  - Achimota Station (Nsawam Road opposite Achimota Mall entrance)
+  - Madina Zongo Junction (Traffic light intersection at Spintex loading zone)
+  - VIP Station Circle (Behind overhead flyover near Intercity STC yard)
+
+The parser will extract names, infer category, and run the 20m duplicate guard.
+Entries too close to existing POIs will be skipped automatically."></textarea>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px">
+              <select id="ingestCat" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-family:monospace;font-size:11px;">
+                <option value="auto">AUTO-DETECT CATEGORY</option>
+                <option value="transport">transport</option>
+                <option value="market">market</option>
+                <option value="food">food</option>
+                <option value="hotel">hotel</option>
+                <option value="mall">mall</option>
+                <option value="area">area</option>
+                <option value="office">office</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-danger" onclick="clearIngest()">✕ CLEAR</button>
+              <button class="btn btn-primary" onclick="runIngest()" id="ingestBtn">⬆ INGEST DATA</button>
+            </div>
+          </div>
+
+          <div id="ingestLog" class="log-box" style="margin-top:14px;height:220px">
+            <span class="info">// ingest results will appear here</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION: MATCH TELEMETRY ══════════════════════════════════════ -->
+    <div id="sec-telemetry" class="section-hidden">
+
+      <div class="metrics-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="metric ok">
+          <div class="metric-label">HIGH ZONES</div>
+          <div class="metric-value" id="tel-high">—</div>
+          <div class="metric-sub">Confirmed active</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">MEDIUM ZONES</div>
+          <div class="metric-value" id="tel-medium" style="color:var(--accent2)">—</div>
+          <div class="metric-sub">Mixed signal</div>
+        </div>
+        <div class="metric warn">
+          <div class="metric-label">VOLATILE ZONES</div>
+          <div class="metric-value" id="tel-volatile">—</div>
+          <div class="metric-sub">Dry or noisy</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">PREDICTIVE OFFSET</div>
+          <div class="metric-value" id="tel-offset" style="color:var(--accent)">+15m</div>
+          <div class="metric-sub">Front-runner window</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">EXTERNAL MATCH PROBABILITY — LIVE ZONE SCORES</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:10px;color:var(--muted)" id="tel-refreshed">never</span>
+            <button class="btn btn-primary" onclick="loadTelemetry()">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+            Rider feedback from <strong style="color:var(--accent)">POST /booster/telemetry</strong>
+            adjusts per-cell weights in real time.
+            <span style="color:var(--success)">●</span> <strong>HIGH</strong> = zone confirmed active (weight ≥ 1.12, ≥2 pings) &nbsp;
+            <span style="color:var(--accent2)">●</span> <strong>MEDIUM</strong> = mixed signal &nbsp;
+            <span style="color:var(--danger)">●</span> <strong>VOLATILE</strong> = dry or conflicting
+          </p>
+
+          <div style="margin-bottom:14px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">INJECT TEST EVENT</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input type="number" id="tel-lat" value="5.605" step="0.001" placeholder="lat"
+                style="width:90px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+              <input type="number" id="tel-lng" value="-0.173" step="0.001" placeholder="lng"
+                style="width:90px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+              <select id="tel-status" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-family:monospace;font-size:12px;">
+                <option value="success_ping">✅  success_ping  (+5% weight)</option>
+                <option value="dry_idle">🔴  dry_idle  (−10% weight)</option>
+                <option value="timeout">⚠  timeout  (−3% weight)</option>
+              </select>
+              <button class="btn btn-primary" onclick="injectTelemetry()" id="tel-inject-btn">⬆ SEND</button>
+            </div>
+            <div id="tel-inject-log" class="log-box" style="margin-top:10px;height:80px">
+              <span class="info">// telemetry event log</span>
+            </div>
+          </div>
+
+          <div id="tel-table-wrap" style="overflow-x:auto">
+            <span style="color:var(--muted);font-size:11px">Click REFRESH to load zone telemetry…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION: SHADOW MATRIX ═════════════════════════════════════════ -->
+    <div id="sec-shadow" class="section-hidden">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">SHADOW MATRIX — ACTIVE DEMAND WINDOWS</span>
+          <button class="btn btn-primary" onclick="loadShadow()">↻ REFRESH</button>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="font-size:10px;color:var(--muted)">HOUR:</span>
+              <input type="number" id="sh-hour" value="" min="0" max="23"
+                placeholder="auto" style="width:60px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="font-size:10px;color:var(--muted)">MIN:</span>
+              <input type="number" id="sh-min" value="" min="0" max="59"
+                placeholder="auto" style="width:60px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-family:monospace;font-size:12px;">
+            </div>
+          </div>
+          <div id="shadowTable" style="overflow-x:auto">
+            <span style="color:var(--muted);font-size:11px">Click REFRESH to load shadow matrix…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = '';   // same origin
+
+// ── CLOCK ───────────────────────────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  document.getElementById('clockEl').textContent =
+    n.toLocaleTimeString('en-GB') + '  |  Accra UTC+0';
+}
+setInterval(tick, 1000); tick();
+
+// ── SECTION NAVIGATION ───────────────────────────────────────────────────────
+function showSection(id, el) {
+  document.querySelectorAll('main > div').forEach(d => d.classList.add('section-hidden'));
+  document.getElementById('sec-' + id).classList.remove('section-hidden');
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── HEALTH ───────────────────────────────────────────────────────────────────
+async function refreshHealth() {
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  try {
+    const r = await fetch(API + '/booster/health');
+    const d = await r.json();
+    dot.className = 'dot live';
+    txt.textContent = 'ENGINE ONLINE';
+    document.getElementById('m-pois').textContent   = (d.places_loaded||0).toLocaleString();
+    document.getElementById('m-cells').textContent  = (d.grid_cells||0).toLocaleString();
+    document.getElementById('m-shadow').textContent = d.shadow_matrix_zones || '—';
+    document.getElementById('m-status').textContent = d.status?.toUpperCase() || 'OK';
+    document.getElementById('m-status-sub').textContent = 'v' + (d.version||'?');
+    document.getElementById('hv-version').textContent = d.version || '—';
+    document.getElementById('hv-algo').textContent    = d.algorithm || '—';
+    document.getElementById('hv-road').textContent    = d.road_quality_zones ?? '—';
+    document.getElementById('hv-b2b').textContent     = d.b2b_wholesale_zones ?? '—';
+    document.getElementById('hv-term').textContent    = d.terminal_schedules ?? '—';
+    document.getElementById('hv-ts').textContent      = (d.timestamp||'—').replace('T',' ');
+    document.getElementById('lastRefresh').textContent = 'refreshed ' + new Date().toLocaleTimeString('en-GB');
+  } catch(e) {
+    dot.className = 'dot';
+    txt.textContent = 'ENGINE OFFLINE';
+  }
+}
+refreshHealth();
+setInterval(refreshHealth, 15000);
+
+// ── PROBE ────────────────────────────────────────────────────────────────────
+async function runProbe() {
+  const btn = document.getElementById('probeBtn');
+  const out = document.getElementById('probeOutput');
+  btn.disabled = true; btn.textContent = '⏳ COMPUTING…';
+  out.innerHTML = '<span class="info">// computing…</span>';
+  try {
+    const body = {
+      rider: {
+        lat:  parseFloat(document.getElementById('probe-lat').value),
+        lng:  parseFloat(document.getElementById('probe-lng').value),
+        speed_kmh:    parseFloat(document.getElementById('probe-spd').value),
+        heading_deg:  parseFloat(document.getElementById('probe-hdg').value),
+        has_active_delivery: false,
+        fuel_level_pct: 80,
+      },
+      search_radius_km: parseFloat(document.getElementById('s-sr')?.value || 5),
+      simulate_hotspots: [],
+      rain_active_zones: [],
+    };
+    const r = await fetch(API + '/booster/compute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    const g = d.grid_stats || {};
+    const pv = d.primary_vector;
+    const lines = [
+      `<span class="info">── GRID STATS ──────────────────────────────────────────</span>`,
+      `  Cells scanned   : ${g.cells_scanned}  |  Hotspots: ${g.hotspot_cells}`,
+      `  Avg demand score: ${g.avg_demand_score}`,
+      `  Traffic friction: ${((1-(g.traffic_friction_at_rider||1))*100).toFixed(0)}% degradation  |  Speed: ${g.effective_speed_kmh} km/h`,
+      `  Road surface    : ${g.road_surface}`,
+      `  Shadow windows  : ${g.shadow_windows_firing} firing`,
+      `  Ghost supressed : ${g.ghost_cells_suppressed}  |  Emerging: ${g.emerging_cells}  |  Cash Cows: ${g.cash_cow_cells||0}`,
+      `<span class="info">── PRIMARY VECTOR ──────────────────────────────────────</span>`,
+    ];
+    if (pv) {
+      lines.push(
+        `  Action    : <span class="${pv.action==='MOVE'?'ok':'warn'}">${pv.action}</span>`,
+        `  Target    : ${pv.target_lat?.toFixed(4)}, ${pv.target_lng?.toFixed(4)}`,
+        `  Bearing   : ${pv.bearing_deg}°   TTA: ${pv.tta_min}min`,
+        `  Yield Est : GHS ${pv.expected_yield_ghs}   Confidence: ${(pv.confidence*100).toFixed(0)}%`,
+        `  Reason    : ${pv.reason?.substring(0,120)}…`,
+      );
+    } else {
+      lines.push(`  <span class="warn">No primary vector — HOLD recommended.</span>`);
+    }
+    lines.push(
+      `<span class="info">── HOLD STATE ──────────────────────────────────────────</span>`,
+      `  Recommendation: <span class="${d.hold_recommended?'warn':'ok'}">${d.hold_recommended?'🛑 HOLD':'✅ MOVE'}</span>`,
+      d.hold_reason ? `  Reason: ${d.hold_reason}` : '',
+      `<span class="info">── POLL INTERVAL ───────────────────────────────────────</span>`,
+      `  Next poll: ${d.next_poll_interval_seconds}s  (${g.poll_mode||'—'})`,
+    );
+    out.innerHTML = lines.filter(Boolean).join('\n');
+  } catch(e) {
+    out.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+  btn.disabled = false; btn.textContent = '▶ RUN PROBE';
+}
+
+// ── GUARDS ───────────────────────────────────────────────────────────────────
+function updateGuardCard(id) {
+  const on = document.getElementById('t-' + id).checked;
+  const card  = document.getElementById('gc-' + id);
+  const badge = document.getElementById('gb-' + id);
+  card.className  = 'guard-card ' + (on ? 'on' : 'off');
+  badge.className = 'guard-badge ' + (on ? 'badge-on' : 'badge-off');
+  badge.textContent = on ? 'ACTIVE' : 'DISABLED';
+}
+
+async function saveGuards() {
+  const guards = {
+    ghost_penalty:     document.getElementById('t-ghost').checked,
+    cash_cow_guard:    document.getElementById('t-cashcow').checked,
+    megachurch_waves:  document.getElementById('t-megachurch').checked,
+    corp_arbitrage:    document.getElementById('t-corparb').checked,
+  };
+  const log = document.getElementById('guardsLog');
+  try {
+    const r = await fetch(API + '/booster/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({guards}),
+    });
+    const d = await r.json();
+    log.innerHTML = `<span class="ok">[${new Date().toLocaleTimeString()}] Guards applied: ${JSON.stringify(d.guards)}</span>`;
+  } catch(e) {
+    log.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+}
+
+// ── PARAMS ────────────────────────────────────────────────────────────────────
+const sliderFmt = { vst: v=>parseFloat(v).toFixed(1), gst: v=>parseInt(v), mpt: v=>parseFloat(v).toFixed(2), fc: v=>parseFloat(v).toFixed(2), sr: v=>parseFloat(v).toFixed(1), gm: v=>parseFloat(v).toFixed(2) };
+function updSlider(id, val) {
+  document.getElementById('lv-' + id).textContent = sliderFmt[id](val);
+  const el = document.getElementById('s-' + id);
+  const min = parseFloat(el.min), max = parseFloat(el.max);
+  const pct = ((parseFloat(val) - min) / (max - min) * 100).toFixed(1) + '%';
+  el.style.setProperty('--pct', pct);
+}
+
+async function saveParams() {
+  const params = {
+    velocity_stable_threshold: parseFloat(document.getElementById('s-vst').value),
+    ghost_score_threshold:     parseFloat(document.getElementById('s-gst').value),
+    min_profit_threshold:      parseFloat(document.getElementById('s-mpt').value),
+    fuel_cost_per_km:          parseFloat(document.getElementById('s-fc').value),
+    search_radius_km:          parseFloat(document.getElementById('s-sr').value),
+    ghost_multiplier:          parseFloat(document.getElementById('s-gm').value),
+  };
+  const log = document.getElementById('paramsLog');
+  const st  = document.getElementById('paramsStatus');
+  try {
+    const r = await fetch(API + '/booster/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({params}),
+    });
+    const d = await r.json();
+    log.innerHTML  = `<span class="ok">[${new Date().toLocaleTimeString()}] Params applied: ${JSON.stringify(d.params)}</span>`;
+    st.textContent = 'Applied at ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    log.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+}
+
+// ── DATA INGEST ───────────────────────────────────────────────────────────────
+function clearIngest() {
+  document.getElementById('ingestBox').value = '';
+  document.getElementById('ingestLog').innerHTML = '<span class="info">// cleared</span>';
+}
+
+async function runIngest() {
+  const text = document.getElementById('ingestBox').value.trim();
+  const cat  = document.getElementById('ingestCat').value;
+  const log  = document.getElementById('ingestLog');
+  const btn  = document.getElementById('ingestBtn');
+  if (!text) { log.innerHTML = '<span class="warn">// paste data first</span>'; return; }
+  btn.disabled = true; btn.textContent = '⏳ PARSING…';
+  log.innerHTML = '<span class="info">// parsing…</span>';
+  try {
+    const r = await fetch(API + '/booster/ingest', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ raw_text: text, default_category: cat === 'auto' ? null : cat }),
+    });
+    const d = await r.json();
+    const lines = [
+      `<span class="ok">[${new Date().toLocaleTimeString()}] INGEST COMPLETE</span>`,
+      `  Parsed    : ${d.parsed} candidates`,
+      `  Added     : <span class="ok">${d.added} new POIs</span>`,
+      `  Skipped   : <span class="warn">${d.skipped} duplicates (20m guard)</span>`,
+      `  Total POIs: ${d.total_pois?.toLocaleString()}`,
+      ``,
+    ];
+    if (d.added_names?.length) {
+      lines.push(`<span class="info">── ACCEPTED ─────────────────────────────────────────────</span>`);
+      d.added_names.forEach(n => lines.push(`  <span class="ok">✓</span> ${n}`));
+    }
+    if (d.skipped_names?.length) {
+      lines.push(`<span class="info">── SKIPPED (duplicate) ──────────────────────────────────</span>`);
+      d.skipped_names.forEach(n => lines.push(`  <span class="warn">≈</span> ${n}`));
+    }
+    if (d.unresolved?.length) {
+      lines.push(`<span class="info">── UNRESOLVED (no coords) ───────────────────────────────</span>`);
+      d.unresolved.forEach(n => lines.push(`  <span class="err">?</span> ${n}`));
+    }
+    log.innerHTML = lines.join('\n');
+  } catch(e) {
+    log.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+  btn.disabled = false; btn.textContent = '⬆ INGEST DATA';
+}
+
+// ── SHADOW MATRIX ─────────────────────────────────────────────────────────────
+async function loadTelemetry() {
+  const wrap = document.getElementById('tel-table-wrap');
+  try {
+    const r = await fetch(API + '/booster/telemetry/stats?top_n=30');
+    const d = await r.json();
+    document.getElementById('tel-high').textContent    = d.summary.high;
+    document.getElementById('tel-medium').textContent  = d.summary.medium;
+    document.getElementById('tel-volatile').textContent= d.summary.volatile;
+    document.getElementById('tel-offset').textContent  = '+' + d.predictive_offset_mins + 'm';
+    document.getElementById('tel-refreshed').textContent = 'refreshed ' + new Date().toLocaleTimeString('en-GB');
+
+    if (!d.top_zones.length) {
+      wrap.innerHTML = '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px">No telemetry events yet — inject test events above or send rider feedback via POST /booster/telemetry.</p>';
+      return;
+    }
+
+    const scoreColor = { HIGH: 'var(--success)', MEDIUM: 'var(--accent2)', VOLATILE: 'var(--danger)' };
+    let html = `<table><thead><tr>
+      <th>LAT</th><th>LNG</th><th>MATCH SCORE</th><th>WEIGHT</th>
+      <th>PINGS</th><th>IDLES</th><th>EVENTS</th><th>LAST UPDATED</th>
+    </tr></thead><tbody>`;
+    d.top_zones.forEach(z => {
+      const c = scoreColor[z.match_probability_score] || 'var(--text)';
+      html += `<tr>
+        <td>${z.cell_lat}</td>
+        <td>${z.cell_lng}</td>
+        <td><span style="color:${c};font-weight:bold">● ${z.match_probability_score}</span></td>
+        <td style="color:${z.current_weight>1?'var(--success)':z.current_weight<1?'var(--danger)':'var(--muted)'}">${z.current_weight.toFixed(4)}</td>
+        <td style="color:var(--success)">${z.total_pings}</td>
+        <td style="color:var(--danger)">${z.total_idles}</td>
+        <td>${z.total_events}</td>
+        <td style="color:var(--muted);font-size:10px">${z.last_updated ? z.last_updated.replace('T',' ').substring(0,19) : '—'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  } catch(e) {
+    wrap.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+}
+
+async function injectTelemetry() {
+  const btn = document.getElementById('tel-inject-btn');
+  const log = document.getElementById('tel-inject-log');
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const body = {
+      rider_id:  'dashboard_test_' + Date.now(),
+      grid_cell: {
+        lat: parseFloat(document.getElementById('tel-lat').value),
+        lng: parseFloat(document.getElementById('tel-lng').value),
+      },
+      timestamp: new Date().toISOString(),
+      status:    document.getElementById('tel-status').value,
+    };
+    const r = await fetch(API + '/booster/telemetry', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    const sc = { HIGH:'ok', MEDIUM:'info', VOLATILE:'err' };
+    log.innerHTML = `<span class="${sc[d.match_probability_score]||'info'}">[${new Date().toLocaleTimeString()}] ${body.status.toUpperCase()} @ (${body.grid_cell.lat}, ${body.grid_cell.lng})</span>
+  Weight: ${d.new_weight}  |  Match Score: <strong>${d.match_probability_score}</strong>
+  Pings: ${d.cumulative.pings}  Idles: ${d.cumulative.idles}  Timeouts: ${d.cumulative.timeouts}`;
+    loadTelemetry();
+  } catch(e) {
+    log.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+  btn.disabled = false; btn.textContent = '⬆ SEND';
+}
+
+async function loadShadow() {
+  const h = document.getElementById('sh-hour').value;
+  const m = document.getElementById('sh-min').value;
+  const div = document.getElementById('shadowTable');
+  let url = API + '/booster/shadow';
+  const params = [];
+  if (h !== '') params.push('hour=' + h);
+  if (m !== '') params.push('minute=' + m);
+  if (params.length) url += '?' + params.join('&');
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    let html = `<p style="font-size:11px;color:var(--muted);margin-bottom:12px">Time: ${String(d.hour).padStart(2,'0')}:${String(d.minute).padStart(2,'0')}  |  <span style="color:var(--accent)">${d.count} active windows</span></p>`;
+    html += `<table><thead><tr><th>ZONE</th><th>STATUS</th></tr></thead><tbody>`;
+    const active = new Set(d.active_windows);
+    // Show active ones first
+    active.forEach(name => {
+      html += `<tr><td>${name}</td><td><span class="badge-active">ACTIVE</span></td></tr>`;
+    });
+    if (active.size === 0) {
+      html += `<tr><td colspan="2" style="color:var(--muted);text-align:center;padding:16px">No shadow windows active at this time.</td></tr>`;
+    }
+    html += `</tbody></table>`;
+    div.innerHTML = html;
+  } catch(e) {
+    div.innerHTML = `<span class="err">ERROR: ${e.message}</span>`;
+  }
+}
+</script>
+</body>
+</html>
