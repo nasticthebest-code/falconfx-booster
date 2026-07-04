@@ -632,6 +632,7 @@ class BoosterOutput:
     hold_reason: str
     move_degraded: bool                     # v4.2 â€” True = moving on a below-threshold "long shot" zone, not a confident recommendation
     nearby_pick: Optional[dict]              # v4.3 â€” closest decent zone, alternative to the best-overall pick
+    current_location_score: Optional[dict]   # v4.4 â€” demand at rider's OWN current spot, for "here vs there" comparison
     hotspots: list
     primary_vector: Optional[dict]
     leapfrog_vector: Optional[dict]
@@ -1929,6 +1930,19 @@ class BoosterEngine:
                 "distance_km": round(haversine_km(rider.lat, rider.lng, nearest_cell.grid_lat, nearest_cell.grid_lng), 2),
             }
 
+        # â”€â”€ 6.6 Current location score: demand right where the rider is
+        # standing RIGHT NOW, for a direct "here vs there" comparison. If
+        # the rider's exact cell isn't indexed (no places nearby), this is
+        # honestly None rather than a fabricated number.
+        current_cell = self.grid.get_cell(rider.lat, rider.lng)
+        current_location_score = None
+        if current_cell is not None:
+            current_location_score = {
+                "demand_score": round(current_cell.demand_score, 1),
+                "surge_probability": round(current_cell.surge_probability, 2),
+                "label": ", ".join(p["name"] for p in current_cell.places[:2]) or "Your area",
+            }
+
         # â”€â”€ 7. Leapfrog
         leapfrog_vector = self.leapfrog.next_zone(rider, hour, minute)
 
@@ -2006,6 +2020,7 @@ class BoosterEngine:
             hold_reason=hold_reason,
             move_degraded=move_degraded,
             nearby_pick=nearby_pick,
+            current_location_score=current_location_score,
             hotspots=[asdict(h) for h in hotspots_out],
             primary_vector=asdict(primary_vector) if primary_vector else None,
             leapfrog_vector=asdict(leapfrog_vector) if leapfrog_vector else None,
