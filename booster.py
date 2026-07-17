@@ -1,26 +1,26 @@
 """
-â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-â•‘  FalconFX â€” BOOSTER  |  Predictive Demand Engine  v4.0                     â•‘
-â•‘  Accra, Ghana  |  Asymmetric Companion Weapon Architecture                  â•‘
-â•‘                                                                              â•‘
-â•‘  STRATEGIC PARADIGM: SECONDARY COMPANION MAP                                â•‘
-â•‘  Runs alongside Yango / Bolt / Uber / Hubtel â€” NEVER replaces them.         â•‘
-â•‘  Single loyalty: maximise rider net daily income per km.                    â•‘
-â•‘                                                                              â•‘
-â•‘  CORE ALGORITHM: PURE PREDICTION â€” NOT REACTION                             â•‘
-â•‘  Ghost Penalty (Fading)   â†’ dying surge â‰¥85 score, velocity falling:       â•‘
-â•‘                             75% haircut â€” mainstream sees it, dead zone.    â•‘
-â•‘  Cash Cow Guard (Stable)  â†’ â‰¥85 score, velocity STABLE/RISING: zero        â•‘
-â•‘                             haircut â€” active market rush, keep printing.    â•‘
-â•‘  Acceleration Multiplier  â†’ 40-78 band: 1.5-2.0x bonus for imminent        â•‘
-â•‘                             pre-checkout explosion (3-5 min before peak).   â•‘
-â•‘  TTA Lock                 â†’ synchronises rider arrival to 3-5 min BEFORE   â•‘
-â•‘                             checkout so rider is parked before Order fires. â•‘
-â•‘  Mega-Church Waves        â†’ Perez Dome / Action Chapel / ICGC / BlackStar  â•‘
-â•‘                             synchronized dismissal demand spikes injected.  â•‘
-â•‘  Corporate Arbitrage      â†’ Landing zone gate delays baked into net yield.  â•‘
-â•‘                             Legal/consular push + Pre-COB crunch vectors.   â•‘
-â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  FalconFX — BOOSTER  |  Predictive Demand Engine  v4.0                     ║
+║  Accra, Ghana  |  Asymmetric Companion Weapon Architecture                  ║
+║                                                                              ║
+║  STRATEGIC PARADIGM: SECONDARY COMPANION MAP                                ║
+║  Runs alongside Yango / Bolt / Uber / Hubtel — NEVER replaces them.         ║
+║  Single loyalty: maximise rider net daily income per km.                    ║
+║                                                                              ║
+║  CORE ALGORITHM: PURE PREDICTION — NOT REACTION                             ║
+║  Ghost Penalty (Fading)   → dying surge ≥85 score, velocity falling:       ║
+║                             75% haircut — mainstream sees it, dead zone.    ║
+║  Cash Cow Guard (Stable)  → ≥85 score, velocity STABLE/RISING: zero        ║
+║                             haircut — active market rush, keep printing.    ║
+║  Acceleration Multiplier  → 40-78 band: 1.5-2.0x bonus for imminent        ║
+║                             pre-checkout explosion (3-5 min before peak).   ║
+║  TTA Lock                 → synchronises rider arrival to 3-5 min BEFORE   ║
+║                             checkout so rider is parked before Order fires. ║
+║  Mega-Church Waves        → Perez Dome / Action Chapel / ICGC / BlackStar  ║
+║                             synchronized dismissal demand spikes injected.  ║
+║  Corporate Arbitrage      → Landing zone gate delays baked into net yield.  ║
+║                             Legal/consular push + Pre-COB crunch vectors.   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
 from __future__ import annotations
@@ -28,38 +28,39 @@ from __future__ import annotations
 import json
 import math
 import random
+import re
 import datetime
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 1 â€” CONSTANTS & CONFIGURATION
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 1 — CONSTANTS & CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
 
 EARTH_RADIUS_KM = 6371.0
-GRID_RESOLUTION = 3          # decimal places â†’ ~110 m cell at Accra latitude
+GRID_RESOLUTION = 3          # decimal places → ~110 m cell at Accra latitude
 FUEL_COST_GHS_PER_KM = 1.80  # GHS per km (petrol-equivalent for motorbike)
-MIN_PROFIT_THRESHOLD = 4.00  # GHS â€” below this, HOLD is recommended
+MIN_PROFIT_THRESHOLD = 4.00  # GHS — below this, HOLD is recommended
 ACCRA_LAT_CENTRE = 5.60
 ACCRA_LNG_CENTRE = -0.18
 OFF_PEAK_SPEED_KMH = 50.0    # baseline free-flow speed
 ARTERIAL_PEAK_DEGRADATION = 0.60   # 60% slowdown on 70% of major arteries
 ARTERIAL_PEAK_COVERAGE = 0.70      # fraction of arterial grid affected
 
-# â”€â”€ Velocity Trend Validation â€” Cash Cow Guard threshold
+# ── Velocity Trend Validation — Cash Cow Guard threshold
 # If a zone's demand_velocity >= this, the ghost haircut is SUPPRESSED even
-# at score â‰¥ 85. The zone is still printing money (deep market rush, downpour).
-VELOCITY_TREND_STABLE_THRESHOLD = 8.0    # velocity units â€” above = sustained cash cow
+# at score ≥ 85. The zone is still printing money (deep market rush, downpour).
+VELOCITY_TREND_STABLE_THRESHOLD = 8.0    # velocity units — above = sustained cash cow
 
-# â”€â”€ EXTERNAL POSITIONING OVERLAY â€” Predictive Front-Runner Offset
+# ── EXTERNAL POSITIONING OVERLAY — Predictive Front-Runner Offset
 # Demand signals are injected for (current_time + PREDICTIVE_OFFSET_MINS) so riders
 # are positioned BEFORE third-party apps trigger global surge visibility.
 # Covers: corporate COB ramp, nightlife pre-loading, church dismissal, AM rush.
 PREDICTIVE_OFFSET_MINS = 15              # minutes ahead of live clock
 
-# â”€â”€ Category demand weights (how likely a place type generates delivery orders)
+# ── Category demand weights (how likely a place type generates delivery orders)
 CATEGORY_DEMAND_WEIGHT = {
     "food":       10,
     "market":      9,
@@ -80,9 +81,9 @@ CATEGORY_DEMAND_WEIGHT = {
     "other":       1,
 }
 
-# â”€â”€ Kitchen prep buffers in minutes (category â†’ min, max)
+# ── Kitchen prep buffers in minutes (category → min, max)
 KITCHEN_PREP_BUFFER = {
-    "food":    (12, 15),   # chop bars, local restaurants â€” cook-to-order
+    "food":    (12, 15),   # chop bars, local restaurants — cook-to-order
     "mall":    (3,  5),    # retail pick-pack
     "market":  (5,  8),    # market vendors assembling orders
     "hotel":   (10, 20),   # room service / F&B
@@ -93,13 +94,13 @@ INSTANT_CATEGORIES = {
     "hospital", "bank", "fuel", "transport", "university", "school", "office", "govt"
 }
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 # CORRIDOR TRAFFIC CONSTRAINTS  (ACCRA_TRAFFIC_CONSTRAINTS)
 # Exact degradation profiles per arterial corridor with 2026 constraints.
 # peak_hours: list of (h_start, m_start, h_end, m_end) tuples (24-hr clock)
 # speed_degradation: fraction of speed LOST (0.45 = 45% slower than baseline)
 # disruption_flag: force reroute avoidance when True
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 ACCRA_TRAFFIC_CONSTRAINTS = {
     "spintex_road": {
         "lat": 5.620, "lng": -0.110,
@@ -118,8 +119,8 @@ ACCRA_TRAFFIC_CONSTRAINTS = {
         "lat": 5.650, "lng": -0.172,
         "radius_km": 2.5,
         "peak_hours": [(6, 30, 10, 0), (15, 30, 20, 30)],
-        "speed_degradation": 0.75,      # 75% â€” 2026 lane closures + 4â†’3 lane reduction
-        "accra_madina_degradation": 0.75,  # worst direction: Accra â†’ Madina
+        "speed_degradation": 0.75,      # 75% — 2026 lane closures + 4→3 lane reduction
+        "accra_madina_degradation": 0.75,  # worst direction: Accra → Madina
         "disruption_flag": True,           # engine avoids Accra-Madina cuts
     },
     "george_bush_n1": {
@@ -130,7 +131,7 @@ ACCRA_TRAFFIC_CONSTRAINTS = {
     },
 }
 
-# â”€â”€ Known Accra traffic bottlenecks (expanded â€” all major choke points)
+# ── Known Accra traffic bottlenecks (expanded — all major choke points)
 #    (name, lat, lng, peak_h_start, peak_h_end, severity)
 BOTTLENECKS = [
     # Spintex corridor
@@ -139,7 +140,7 @@ BOTTLENECKS = [
     # Liberation Road
     ("Liberation Road (AM)",        5.576, -0.196, 7,   9, 0.35),
     ("Liberation Road (PM)",        5.576, -0.196, 16, 19, 0.35),
-    # Tetteh Quarshie â€” 2026 DISRUPTION FLAG: elevated to 75%
+    # Tetteh Quarshie — 2026 DISRUPTION FLAG: elevated to 75%
     ("Tetteh Quarshie (AM)",        5.650, -0.172, 6,  10, 0.75),
     ("Tetteh Quarshie (PM)",        5.650, -0.172, 15, 21, 0.70),
     # George Bush / N1
@@ -164,7 +165,7 @@ BOTTLENECKS = [
     ("Independence Ave / KojoThom", 5.554, -0.204, 7,  20, 0.45),
 ]
 
-# â”€â”€ Pedestrian Congestion Zones (separate friction layer, always-on during window)
+# ── Pedestrian Congestion Zones (separate friction layer, always-on during window)
 #    (name, lat, lng, radius_km, h_start_float, h_end_float, ped_penalty)
 PEDESTRIAN_CONGESTION_ZONES = [
     ("Danquah Circle Waakye Rush",   5.567, -0.178, 0.35, 7.0,  9.5,  0.30),
@@ -179,7 +180,7 @@ PEDESTRIAN_CONGESTION_ZONES = [
     ("Osu Oxford St Night (PM)",     5.564, -0.178, 0.50, 20.0, 23.0, 0.25),
 ]
 
-# â”€â”€ Low-density outskirt zones for Return Ticket Arbitrage
+# ── Low-density outskirt zones for Return Ticket Arbitrage
 LOW_DENSITY_ZONES = [
     ("Adenta",    5.706, -0.163, 5.0),
     ("Kasoa",     5.534, -0.419, 4.0),
@@ -190,22 +191,22 @@ LOW_DENSITY_ZONES = [
     ("Oyibi",     5.770, -0.120, 3.0),
 ]
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 # CORPORATE LANDING ZONE FRICTION CONSTANTS
 # Bakes physical door-to-desk delays (gate screening + walk + lift) into the
 # Net Hourly Yield calculation to prevent the Invisible Non-Riding Time Drain.
 # peak_windows: [(h_start_float, h_end_float)]  decimal hours
-# sunday_closed: True â†’ 100% access denial on Sundays
+# sunday_closed: True → 100% access denial on Sundays
 # saturday_capacity: 0.5 = 50% reduced, 1.0 = full
-# cutoff_hour: hard deadline â€” engine issues URGENT note if approaching
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# cutoff_hour: hard deadline — engine issues URGENT note if approaching
+# ──────────────────────────────────────────────────────────────────────────────
 CORPORATE_LANDING_ZONES = [
     {
         "name": "Ministries District / Accra Central Financial Core",
         "lat": 5.558, "lng": -0.197,
         "radius_km": 0.8,
         "gate_screening_min": 15,    # ID check + package inspection
-        "walk_distance_m": 300,      # bikes banned inside â€” walk from perimeter
+        "walk_distance_m": 300,      # bikes banned inside — walk from perimeter
         "elevator_wait_min": 12,
         "peak_windows": [(8.0, 9.5), (11.0, 12.5), (14.5, 16.0)],
         "sunday_closed": True,
@@ -238,29 +239,29 @@ CORPORATE_LANDING_ZONES = [
     },
 ]
 
-# â”€â”€ Centralized Pickup Nodes â€” exact access points for each corporate zone
+# ── Centralized Pickup Nodes — exact access points for each corporate zone
 CORPORATE_PICKUP_NODES = [
     {
-        "name": "Ecobank HQ â€” Ground Floor Mailroom Annex",
+        "name": "Ecobank HQ — Ground Floor Mailroom Annex",
         "lat": 5.572, "lng": -0.194,
         "flow": "A",
         "access": "Rear service gate, Morocco Lane, West Ridge",
     },
     {
-        "name": "Standard Chartered Tower â€” Basement Courier Bays",
+        "name": "Standard Chartered Tower — Basement Courier Bays",
         "lat": 5.604, "lng": -0.168,
         "flow": "B",
         "access": "Basement courier bay B1 level, Airport City",
     },
     {
-        "name": "Ministries â€” Ground Floor General Registry",
+        "name": "Ministries — Ground Floor General Registry",
         "lat": 5.556, "lng": -0.198,
         "flow": "A",
         "access": "General Registry offices, manual stamp books required",
     },
 ]
 
-# â”€â”€ Outbound Routing Flows (three destination categories)
+# ── Outbound Routing Flows (three destination categories)
 CORPORATE_OUTBOUND_FLOWS = {
     "A": {
         "name": "Regulatory / Judicial Flow",
@@ -288,11 +289,11 @@ CORPORATE_OUTBOUND_FLOWS = {
     },
 }
 
-# â”€â”€ Terminal Schedules for WaybillInterceptor (exact real-world timetables)
-#    windows: list of (h_start_float, h_end_float) â€” decimal hours
+# ── Terminal Schedules for WaybillInterceptor (exact real-world timetables)
+#    windows: list of (h_start_float, h_end_float) — decimal hours
 #    peak_stacking: high-density arrival clusters within windows
 #    type: "FIRST_COME" | "STC_HOURLY" | "MIXED"
-#    weekend_days: 0=Monâ€¦6=Sun; listed days get weekend_multiplier applied
+#    weekend_days: 0=Mon…6=Sun; listed days get weekend_multiplier applied
 TERMINAL_SCHEDULES = [
     {
         "name": "Kwame Nkrumah Circle (VIP/Odawna/Obra Spot/Mamobi)",
@@ -348,8 +349,8 @@ TERMINAL_SCHEDULES = [
     },
 ]
 
-# â”€â”€ B2B Wholesale & Waybill Epicenters
-#    day_weights: {weekday_int: multiplier}  0=Monâ€¦6=Sun
+# ── B2B Wholesale & Waybill Epicenters
+#    day_weights: {weekday_int: multiplier}  0=Mon…6=Sun
 #    windows: [(h_start_float, h_end_float), ...]
 #    primary_window: first dispatch wave
 #    secondary_window: clearance wave
@@ -362,7 +363,7 @@ B2B_WHOLESALE_ZONES = [
         # Wed (2) and Sat (5) heavy restock multipliers
         "primary_window": (7.0, 10.0),    # morning wholesale dispatch wave
         "secondary_window": (15.0, 17.0), # afternoon clearance wave
-        "ama_clamp_risk": True,            # narrow alleys â†’ rapid mobile pickup vectors
+        "ama_clamp_risk": True,            # narrow alleys → rapid mobile pickup vectors
         "base_intensity": 70,
     },
     {
@@ -390,7 +391,7 @@ B2B_WHOLESALE_ZONES = [
     },
 ]
 
-# â”€â”€ Rain-impacted district polygons
+# ── Rain-impacted district polygons
 RAIN_FLOOD_ZONES = [
     ("Accra Central",  5.550, -0.206, 1.5),
     ("Lapaz",          5.609, -0.243, 1.2),
@@ -401,7 +402,7 @@ RAIN_FLOOD_ZONES = [
     ("Abossey Okai",   5.566, -0.231, 0.8),
 ]
 
-# â”€â”€ Road Quality Zones: unpaved / potholed / unstructured secondary roads
+# ── Road Quality Zones: unpaved / potholed / unstructured secondary roads
 ROAD_QUALITY_ZONES = [
     ("Nima/Maamobi Back Streets",    5.589, -0.211, 0.6, 0.30),
     ("Chorkor Coastal Track",        5.537, -0.243, 0.8, 0.42),
@@ -419,16 +420,16 @@ ROAD_QUALITY_ZONES = [
     ("Kotobabi Unpaved",             5.581, -0.220, 0.4, 0.28),
 ]
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# SHADOW MATRIX â€” Offline / WhatsApp / phone-in demand sources invisible
+# ──────────────────────────────────────────────────────────────────────────────
+# SHADOW MATRIX — Offline / WhatsApp / phone-in demand sources invisible
 # to aggregator platforms. Fully expanded v3.0 (27 zones).
 #
 # Format: (name, lat, lng, radius_km, windows [(h_start, h_end)], intensity)
 # h values are decimal hours: 7.5 = 07:30, 20.0 = 20:00
 # intensity 0-100: demand boost score injected into nearby grid cells
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 SHADOW_MATRIX = [
-    # â”€â”€ MORNING WAAKYE WAVE (07:00-09:00, peak 07:30-09:30)
+    # ── MORNING WAAKYE WAVE (07:00-09:00, peak 07:30-09:30)
     ("Nima Waakye Belt",              5.589, -0.211, 0.4, [(7.0, 9.5)],              62),
     ("Osu Danquah Circle Waakye",     5.567, -0.178, 0.4, [(7.0, 9.5)],              72),  # legendary
     ("Cantonments Road Waakye",       5.573, -0.175, 0.3, [(7.0, 9.5)],              58),
@@ -441,7 +442,7 @@ SHADOW_MATRIX = [
     ("Ashaiman Market Food",          5.698,  0.031, 0.4, [(7.0, 9.5),(12.0,14.0)],  50),
     ("Dansoman Market Food",          5.546, -0.253, 0.4, [(7.0, 9.5),(12.0,14.0)],  46),
 
-    # â”€â”€ MIDDAY BUSH CANTEEN LUNCH WAVE (11:30-13:30, 12-min kitchen prep buffer)
+    # ── MIDDAY BUSH CANTEEN LUNCH WAVE (11:30-13:30, 12-min kitchen prep buffer)
     ("Shiashie Market Junction",      5.608, -0.166, 0.4, [(11.5, 13.5)],            68),  # corporate lunch
     ("East Legon Main Road Canteen",  5.637, -0.158, 0.4, [(11.5, 13.5)],            64),
     ("North Ridge Ministries Chop",   5.580, -0.195, 0.4, [(11.5, 13.5)],            62),
@@ -452,7 +453,7 @@ SHADOW_MATRIX = [
     ("Adabraka Canteen Row",          5.562, -0.212, 0.3, [(11.5, 13.5),(18.0,21.0)],42),
     ("Pig Farm Jct Chop",             5.580, -0.230, 0.3, [(11.5, 13.5)],             36),
 
-    # â”€â”€ NIGHT-MARKET STREET FOOD WAVE (20:00-23:00, active 18:00-03:00)
+    # ── NIGHT-MARKET STREET FOOD WAVE (20:00-23:00, active 18:00-03:00)
     ("Osu Oxford St Night Market",    5.564, -0.178, 0.5, [(18.0, 23.0)],            75),  # peak 20-23
     ("G&G Special Waakye (Osu)",      5.568, -0.177, 0.2, [(18.0, 23.0)],            70),  # legendary
     ("Osu Blue Gate Night Stalls",    5.562, -0.175, 0.3, [(18.0, 23.0)],            68),
@@ -462,21 +463,21 @@ SHADOW_MATRIX = [
     ("Osu Canteens (Dinner Run)",     5.565, -0.178, 0.4, [(11.5,13.5),(18.0,21.0)], 46),
 ]
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 # MEGA-CHURCH & HIGH-DENSITY EVENT SPATIAL WAVES  (v4.0)
 # Synchronized exit rushes from Accra's largest worship centres + stadium events.
 #
 # windows format:
 #   {"days": [0-6], "h_start": float, "h_end": float, "multiplier": float,
 #    "label": str, "crosses_midnight": bool}
-#   crosses_midnight=True â†’ h_float >= h_start OR h_float < (h_end % 24)
+#   crosses_midnight=True → h_float >= h_start OR h_float < (h_end % 24)
 #
-# spintex_friction: True â†’ Action Chapel triggers Spintex road gridlock bonus
+# spintex_friction: True → Action Chapel triggers Spintex road gridlock bonus
 # independence events handled via date check in _megachurch_event_boost
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ──────────────────────────────────────────────────────────────────────────────
 MEGACHURCH_EVENT_ZONES = [
     {
-        "name": "Perez Chapel International â€” The Perez Dome, Dzorwulu",
+        "name": "Perez Chapel International — The Perez Dome, Dzorwulu",
         "lat": 5.602, "lng": -0.186,
         "radius_km": 1.2,
         "capacity": 14000,
@@ -497,7 +498,7 @@ MEGACHURCH_EVENT_ZONES = [
         "spintex_friction_penalty": 0.0,
     },
     {
-        "name": "Action Chapel International â€” Impact Arena, Spintex Road",
+        "name": "Action Chapel International — Impact Arena, Spintex Road",
         "lat": 5.627, "lng": -0.103,
         "radius_km": 1.5,
         "capacity": 30000,
@@ -515,7 +516,7 @@ MEGACHURCH_EVENT_ZONES = [
         "spintex_friction_penalty": 0.70,  # 70% speed degradation on Spintex during events
     },
     {
-        "name": "ICGC Christ Temple â€” Abossey Okai Linked Campus",
+        "name": "ICGC Christ Temple — Abossey Okai Linked Campus",
         "lat": 5.556, "lng": -0.227,
         "radius_km": 0.8,
         "capacity": 8000,
@@ -536,7 +537,7 @@ MEGACHURCH_EVENT_ZONES = [
         "radius_km": 1.0,
         "capacity": 40000,
         "windows": [
-            # Weekend concert closing slots â€” +500-800% â†’ multiplier 7-9x
+            # Weekend concert closing slots — +500-800% → multiplier 7-9x
             {"days": [5, 6], "h_start": 21.0, "h_end": 23.0,
              "multiplier": 9.0, "label": "Weekend Concert Exit Surge", "crosses_midnight": False},
         ],
@@ -544,7 +545,7 @@ MEGACHURCH_EVENT_ZONES = [
         "independence_parade": {
             "month": 3, "day": 6,
             "windows": [(10.0, 13.0)],
-            "multiplier": 9.0,    # +500-800% â†’ 9x for 30,000+ synchronized exit
+            "multiplier": 9.0,    # +500-800% → 9x for 30,000+ synchronized exit
             "label": "Independence Parade Exit",
         },
         "independence_run": {
@@ -559,9 +560,9 @@ MEGACHURCH_EVENT_ZONES = [
 ]
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 2 â€” DATA STRUCTURES
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2 — DATA STRUCTURES
+# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class GridCell:
@@ -621,7 +622,7 @@ class HotSpot:
     category_mix: dict
     label: str
     acceleration_band: str   # "EMERGING" | "PEAKING" | "DECLINING"
-    opportunity_score: float = 0.0  # v4.4 â€” single 0-100 combining demand+confidence+distance, for the rider-facing headline number
+    opportunity_score: float = 0.0  # v4.4 — single 0-100 combining demand+confidence+distance, for the rider-facing headline number
 
 
 @dataclass
@@ -630,23 +631,23 @@ class BoosterOutput:
     rider: dict
     hold_recommended: bool
     hold_reason: str
-    move_degraded: bool                     # v4.2 â€” True = moving on a below-threshold "long shot" zone, not a confident recommendation
-    nearby_pick: Optional[dict]              # v4.3 â€” closest decent zone, alternative to the best-overall pick
-    current_location_score: Optional[dict]   # v4.4 â€” demand at rider's OWN current spot, for "here vs there" comparison
+    move_degraded: bool                     # v4.2 — True = moving on a below-threshold "long shot" zone, not a confident recommendation
+    nearby_pick: Optional[dict]              # v4.3 — closest decent zone, alternative to the best-overall pick
+    current_location_score: Optional[dict]   # v4.4 — demand at rider's OWN current spot, for "here vs there" comparison
     hotspots: list
     primary_vector: Optional[dict]
     leapfrog_vector: Optional[dict]
     arbitrage_alert: Optional[dict]
     waybill_alert: Optional[dict]
     weather_advisory: Optional[dict]
-    corporate_arbitrage: Optional[dict]     # v4.0 â€” corporate landing zone routing
+    corporate_arbitrage: Optional[dict]     # v4.0 — corporate landing zone routing
     grid_stats: dict
     next_poll_interval_seconds: int
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 3 â€” SPATIAL UTILITIES
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 — SPATIAL UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
 
 def haversine_km(lat1, lng1, lat2, lng2) -> float:
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -680,6 +681,40 @@ def grid_key(lat, lng) -> tuple:
     return (round(lat, GRID_RESOLUTION), round(lng, GRID_RESOLUTION))
 
 
+_STREET_SUFFIX_RE = re.compile(
+    r'\b(street|road|lane|avenue|ave|close|drive|way|crescent|highway)\s*$', re.I
+)
+_GENERIC_STREET_PREFIX_RE = re.compile(r'^(avenue|street|road)\s+[a-z0-9]', re.I)
+
+def is_street_name(place_name: str) -> bool:
+    """
+    Returns True if a place's name is actually a street/road label
+    (e.g. 'Avenue A West', 'Kraku Street', 'Spintex Road') rather than a
+    real venue. These carry zero delivery-demand signal and should not
+    contribute to a grid cell's base_weight.
+
+    Deliberately narrower than a plain word-boundary search: an earlier
+    version of this check matched ANY occurrence of a street-word
+    anywhere in the name, which incorrectly stripped real, high-value
+    venues like "Circle Station", "Circle Hospital", "Neoplan Bus
+    Station Circle", and "Circle Artisan Market" — all genuine
+    businesses that happen to sit in the Circle/Kwame Nkrumah area and
+    have "Circle" in their name, not street segments. This version only
+    matches when the street-word is a trailing suffix (the standard
+    "X Street" / "X Road" pattern) or a generic leading label, which
+    matches how actual OSM-scraped street geometries are named while
+    leaving named venues alone.
+    """
+    name = (place_name or "").strip()
+    if not name:
+        return False
+    if _STREET_SUFFIX_RE.search(name):
+        return True
+    if _GENERIC_STREET_PREFIX_RE.match(name):
+        return True
+    return False
+
+
 def compass_label(deg) -> str:
     dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
             "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
@@ -687,7 +722,7 @@ def compass_label(deg) -> str:
 
 
 def _hm_to_float(h: int, m: int) -> float:
-    """Convert hour+minute to decimal float (e.g. 6h30m â†’ 6.5)."""
+    """Convert hour+minute to decimal float (e.g. 6h30m → 6.5)."""
     return h + m / 60.0
 
 
@@ -698,9 +733,9 @@ def _offset_time(hour: int, minute: int, offset_mins: int) -> tuple:
     return (total // 60) % 24, total % 60
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 4 â€” GRID ENGINE
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4 — GRID ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
 
 class GridEngine:
     def __init__(self, places_path: str = "places.json"):
@@ -710,7 +745,16 @@ class GridEngine:
     def _load(self, path: str):
         with open(path, "r", encoding="utf-8") as f:
             places = json.load(f)
+
+        skipped_streets = 0
         for p in places:
+            # Skip street/road-name entries entirely — they are geocoding
+            # artifacts, not businesses, and should not inflate any cell's
+            # score just because a neighborhood has a dense street grid.
+            if is_street_name(p.get("name", "")):
+                skipped_streets += 1
+                continue
+
             lat, lng = p["lat"], p["lng"]
             key = grid_key(lat, lng)
             if key not in self.cells:
@@ -718,16 +762,46 @@ class GridEngine:
             cell = self.cells[key]
             cell.places.append(p)
             cell.base_weight += CATEGORY_DEMAND_WEIGHT.get(p.get("cat", "other"), 1)
-        if self.cells:
-            max_w = max(c.base_weight for c in self.cells.values()) or 1
-            for c in self.cells.values():
-                c.base_weight = (c.base_weight / max_w) * 100
-        print(f"  [GridEngine] Indexed {len(places):,} places â†’ {len(self.cells):,} grid cells")
+
+        # NOTE: we deliberately do NOT normalize base_weight against a
+        # single citywide max cell here anymore. Doing so crushed every
+        # neighborhood except the single densest one (previously Nima)
+        # down to single-digit percentages, making them functionally
+        # indistinguishable from each other and from zero. base_weight
+        # is now kept as a raw, locally-meaningful category-weighted sum.
+        # Normalization now happens LOCALLY, per-query, in nearby_cells()
+        # below — each rider's candidate zones are compared against the
+        # best zone actually near THEM, not against the single busiest
+        # market in the entire city.
+
+        print(f"  [GridEngine] Indexed {len(places) - skipped_streets:,} places "
+              f"({skipped_streets:,} street-name entries skipped) → "
+              f"{len(self.cells):,} grid cells")
 
     def get_cell(self, lat, lng) -> Optional[GridCell]:
         return self.cells.get(grid_key(lat, lng))
 
-    def nearby_cells(self, lat, lng, radius_km: float) -> list:
+    def nearby_cells(self, lat, lng, radius_km: float,
+                      local_normalize: bool = True) -> list:
+        """
+        Returns grid cells within radius_km of (lat, lng).
+
+        If local_normalize is True (default), each returned cell also
+        gets a `.local_score` attribute (0-100) computed against the
+        BEST cell within this specific search radius — not against the
+        single busiest cell in all of Accra. This is what lets Legon,
+        Osu, Spintex etc. meaningfully rank against their own
+        neighbors, instead of all reading near-zero against a market
+        in a completely different part of the city.
+
+        IMPORTANT: this does NOT mutate the cell's stored base_weight.
+        base_weight stays raw and shared across all riders/requests.
+        local_score is set fresh on every call and is safe to read
+        immediately after this call returns, but should not be treated
+        as persistent cell state (a rider searching from a different
+        location a second later will get a different local_score for
+        the same cell, which is correct behaviour).
+        """
         results = []
         dlat = radius_km / 111.0
         dlng = radius_km / (111.0 * math.cos(math.radians(lat)))
@@ -735,20 +809,29 @@ class GridEngine:
             if abs(glat - lat) <= dlat and abs(glng - lng) <= dlng:
                 if haversine_km(lat, lng, glat, glng) <= radius_km:
                     results.append(cell)
+
+        if local_normalize and results:
+            local_max = max(c.base_weight for c in results) or 1
+            for c in results:
+                c.local_score = (c.base_weight / local_max) * 100
+        else:
+            for c in results:
+                c.local_score = c.base_weight
+
         return results
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 5 â€” TRAFFIC FRICTION ENGINE  (4-layer model, v3.0)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 5 — TRAFFIC FRICTION ENGINE  (4-layer model, v3.0)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class TrafficFriction:
     """
     Four-layer speed multiplier:
-      Layer 1 â€” Bottleneck congestion (proximity + time-of-day)
-      Layer 2 â€” Road surface quality (bikes always feel this)
-      Layer 3 â€” Corridor constraints (ACCRA_TRAFFIC_CONSTRAINTS, minute-aware)
-      Layer 4 â€” Pedestrian congestion zones (time-windowed density penalty)
+      Layer 1 — Bottleneck congestion (proximity + time-of-day)
+      Layer 2 — Road surface quality (bikes always feel this)
+      Layer 3 — Corridor constraints (ACCRA_TRAFFIC_CONSTRAINTS, minute-aware)
+      Layer 4 — Pedestrian congestion zones (time-windowed density penalty)
     """
 
     def __init__(self):
@@ -757,7 +840,7 @@ class TrafficFriction:
         self.corridors = ACCRA_TRAFFIC_CONSTRAINTS
         self.ped_zones = PEDESTRIAN_CONGESTION_ZONES
 
-    # â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── helpers ──────────────────────────────────────────────────────────────
 
     @staticmethod
     def _in_peak_window(h_float: float, peak_hours: list) -> bool:
@@ -769,7 +852,7 @@ class TrafficFriction:
                 return True
         return False
 
-    # â”€â”€ Layer 1: bottleneck congestion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Layer 1: bottleneck congestion ───────────────────────────────────────
 
     def _bottleneck_penalty(self, lat: float, lng: float, hour: int) -> float:
         penalty = 0.0
@@ -784,7 +867,7 @@ class TrafficFriction:
             penalty = max(penalty, impact)
         return penalty
 
-    # â”€â”€ Layer 2: road surface quality â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Layer 2: road surface quality ────────────────────────────────────────
 
     def road_surface_penalty(self, lat: float, lng: float) -> float:
         penalty = 0.0
@@ -803,12 +886,12 @@ class TrafficFriction:
             if dist <= radius_km and sp > worst_penalty:
                 worst_name, worst_penalty = name, sp
         if worst_penalty >= 0.40:
-            return f"ROUGH â€” {worst_name} (potholed/unpaved, -{worst_penalty*100:.0f}% speed)"
+            return f"ROUGH — {worst_name} (potholed/unpaved, -{worst_penalty*100:.0f}% speed)"
         if worst_penalty >= 0.20:
-            return f"DEGRADED â€” {worst_name} (-{worst_penalty*100:.0f}% speed)"
+            return f"DEGRADED — {worst_name} (-{worst_penalty*100:.0f}% speed)"
         return "GOOD"
 
-    # â”€â”€ Layer 3: corridor constraints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Layer 3: corridor constraints ────────────────────────────────────────
 
     def _corridor_penalty(self, lat: float, lng: float,
                           hour: int, minute: int) -> float:
@@ -829,7 +912,7 @@ class TrafficFriction:
             penalty = max(penalty, impact)
         return penalty
 
-    # â”€â”€ Layer 4: pedestrian congestion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Layer 4: pedestrian congestion ───────────────────────────────────────
 
     def _pedestrian_penalty(self, lat: float, lng: float,
                             hour: int, minute: int) -> float:
@@ -845,7 +928,7 @@ class TrafficFriction:
             penalty = max(penalty, ped_pen * proximity)
         return penalty
 
-    # â”€â”€ Event friction info (Layer 5 â€” mega-church Spintex gridlock) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Event friction info (Layer 5 — mega-church Spintex gridlock) ──────────
 
     def event_friction_info(self, lat: float, lng: float,
                             hour: int, minute: int, weekday: int) -> Optional[dict]:
@@ -903,12 +986,12 @@ class TrafficFriction:
             return zone["gate_screening_min"] + walk_min + zone["elevator_wait_min"]
         return 0.0
 
-    # â”€â”€ Combined multiplier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Combined multiplier ───────────────────────────────────────────────────
 
     def speed_multiplier(self, lat: float, lng: float,
                          hour: int, minute: int = 0) -> float:
         """
-        Returns multiplier 0.10â€“1.0.
+        Returns multiplier 0.10–1.0.
         1.0 = free flow, 0.10 = severe gridlock + road + pedestrian congestion.
         """
         # Start from arterial baseline considering peak hours
@@ -931,9 +1014,9 @@ class TrafficFriction:
         return base * self.speed_multiplier(rider.lat, rider.lng, hour, minute)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 6 â€” DEMAND SIMULATOR  (pre-checkout flash trigger, v3.0)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 6 — DEMAND SIMULATOR  (pre-checkout flash trigger, v3.0)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class DemandSimulator:
     """
@@ -1033,7 +1116,7 @@ class DemandSimulator:
         for zone in self.megachurch_zones:
             fired = False
 
-            # â”€â”€ Regular time windows (dismissals, vigils, prayer nights)
+            # ── Regular time windows (dismissals, vigils, prayer nights)
             for win in zone.get("windows", []):
                 if weekday not in win["days"]:
                     continue
@@ -1053,14 +1136,14 @@ class DemandSimulator:
                     zone["lat"], zone["lng"],
                     intensity * jitter,
                     zone["radius_km"],
-                    f"{zone['name']} â€” {win['label']}",
+                    f"{zone['name']} — {win['label']}",
                     zone.get("spintex_friction", False),
                     zone.get("spintex_friction_penalty", 0.0),
                 ))
                 fired = True
                 break   # Only fire once per zone per call
 
-            # â”€â”€ Calendar-specific events (Independence Day parade + run)
+            # ── Calendar-specific events (Independence Day parade + run)
             if not fired:
                 for ev_key in ("independence_parade", "independence_run"):
                     ev = zone.get(ev_key)
@@ -1076,7 +1159,7 @@ class DemandSimulator:
                                 zone["lat"], zone["lng"],
                                 intensity * random.uniform(0.95, 1.05),
                                 zone.get("radius_km", 1.0),
-                                f"{zone['name']} â€” {ev['label']}",
+                                f"{zone['name']} — {ev['label']}",
                                 False, 0.0,
                             ))
                             break
@@ -1087,17 +1170,50 @@ class DemandSimulator:
                        simulate_hotspots=None, weekday: int = 0):
         time_mult = self._time_multiplier(hour)
 
-        # â”€â”€ Base scoring
+        # ── Base scoring
         for cell in self.grid.cells.values():
             noise = random.uniform(0.7, 1.3)
             cell.demand_score = cell.base_weight * time_mult * noise
             cell.prep_buffer_min = self._prep_buffer(cell)
-            cell.surge_probability = min(1.0, cell.demand_score / 100.0)
             cell.is_hotspot = False
             cell.checkout_eta_min = None
             cell.demand_velocity = 0.0
 
-        # â”€â”€ Shadow Matrix (offline/WhatsApp/phone-in food demand)
+        # ── LOCAL normalization of demand_score (critical fix).
+        # base_weight is now a RAW, unbounded category-weighted sum (the
+        # earlier citywide max-normalization was removed because it
+        # crushed every neighborhood except the single busiest one down
+        # to near-zero). Without replacing that normalization with
+        # something, demand_score here would be an unbounded raw number,
+        # surge_probability's `demand_score/100` assumption would break,
+        # and — critically — intercept_score()/rank_cells(), which is
+        # what ACTUALLY picks recommendations, reads demand_score, not
+        # local_score. So the earlier "local_score on nearby_cells()"
+        # addition alone did NOT fix ranking; this step does, by scaling
+        # demand_score itself against the best cell within ~4km of it,
+        # using the same bucket-cache as the hotspot pass for performance.
+        SUPER_CELL_DEG = 0.01  # ~1.1km at Accra's latitude
+        NORMALIZE_RADIUS_KM = 4.0
+
+        all_cells_pre = list(self.grid.cells.values())
+        norm_buckets: dict = defaultdict(list)
+        for cell in all_cells_pre:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            norm_buckets[bkey].append(cell)
+
+        for cell in all_cells_pre:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            local_peers = []
+            for dlat in (-1, 0, 1):
+                for dlng in (-1, 0, 1):
+                    for peer in norm_buckets.get((bkey[0] + dlat, bkey[1] + dlng), ()):
+                        if haversine_km(cell.grid_lat, cell.grid_lng, peer.grid_lat, peer.grid_lng) <= NORMALIZE_RADIUS_KM:
+                            local_peers.append(peer)
+            local_max = max((p.demand_score for p in local_peers), default=0) or 1
+            cell.demand_score = min(100.0, (cell.demand_score / local_max) * 100.0)
+            cell.surge_probability = min(1.0, cell.demand_score / 100.0)
+
+        # ── Shadow Matrix (offline/WhatsApp/phone-in food demand)
         for slat, slng, intensity, radius_km, sname in self._shadow_boost(hour, minute):
             for cell in self.grid.nearby_cells(slat, slng, radius_km):
                 dist = haversine_km(slat, slng, cell.grid_lat, cell.grid_lng)
@@ -1106,7 +1222,7 @@ class DemandSimulator:
                 cell.surge_probability = min(1.0, cell.demand_score / 100.0)
                 cell.demand_velocity = max(cell.demand_velocity, boost * 0.5)
 
-        # â”€â”€ B2B Wholesale injection (day-of-week aware)
+        # ── B2B Wholesale injection (day-of-week aware)
         for slat, slng, intensity, radius_km, sname, ama_clamp in \
                 self._b2b_boost(hour, minute, weekday):
             for cell in self.grid.nearby_cells(slat, slng, radius_km):
@@ -1119,7 +1235,7 @@ class DemandSimulator:
                 cell.surge_probability = min(1.0, cell.demand_score / 100.0)
                 cell.demand_velocity = max(cell.demand_velocity, boost * 0.6)
 
-        # â”€â”€ Mega-church & stadium event spatial waves (v4.0)
+        # ── Mega-church & stadium event spatial waves (v4.0)
         for slat, slng, intensity, radius_km, sname, _evt_fric, _fric_pen in \
                 self._megachurch_event_boost(hour, minute, weekday):
             for cell in self.grid.nearby_cells(slat, slng, radius_km):
@@ -1130,7 +1246,7 @@ class DemandSimulator:
                 # Synchronized exits are high-velocity spikes: velocity bonus 0.9x
                 cell.demand_velocity = max(cell.demand_velocity, boost * 0.9)
 
-        # â”€â”€ Platform API / cart spike injection (Bolt/Yango pre-checkout)
+        # ── Platform API / cart spike injection (Bolt/Yango pre-checkout)
         if simulate_hotspots:
             for slat, slng, intensity in simulate_hotspots:
                 for cell in self.grid.nearby_cells(slat, slng, 0.5):
@@ -1140,14 +1256,50 @@ class DemandSimulator:
                     cell.surge_probability = min(1.0, cell.demand_score / 100.0)
                     cell.demand_velocity = max(cell.demand_velocity, boost * 0.8)
 
-        # â”€â”€ Mark hotspots (top 5%) and assign checkout ETAs
-        scores = sorted(c.demand_score for c in self.grid.cells.values())
-        if scores:
-            threshold = scores[int(len(scores) * 0.95)]
-            for cell in self.grid.cells.values():
-                if cell.demand_score >= threshold:
-                    cell.is_hotspot = True
-                    cell.checkout_eta_min = cell.prep_buffer_min + random.uniform(2, 5)
+        # ── Mark hotspots using LOCAL percentile, not one citywide cutoff.
+        # A single global top-5% threshold meant only the single busiest
+        # corridor in Accra could ever qualify — every other neighborhood,
+        # including Legon/East Legon/Airport Residential, was structurally
+        # almost never eligible to be recommended at all.
+        #
+        # PERFORMANCE: with a ~27,000-place dataset, a naive per-cell
+        # radius scan (checking every other cell's distance for every
+        # cell) is O(n * m) and measured out to tens of millions of
+        # operations per refresh — too slow for Render's free-tier shared
+        # CPU. Instead we bucket cells into coarse ~1.1km "super-cells"
+        # once, then for each cell only scan its own super-cell + the 8
+        # neighbors. This is the caching approach flagged as necessary in
+        # the original patch notes, implemented rather than deferred,
+        # since 27k places puts us in that regime today, not hypothetically.
+        LOCAL_HOTSPOT_RADIUS_KM = 4.0
+        LOCAL_HOTSPOT_PERCENTILE = 0.90  # top 10% within the local area
+        SUPER_CELL_DEG = 0.01  # ~1.1km at Accra's latitude — coarser bucket than GRID_RESOLUTION
+
+        all_cells = list(self.grid.cells.values())
+        buckets: dict = defaultdict(list)
+        for cell in all_cells:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            buckets[bkey].append(cell)
+
+        for cell in all_cells:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            local_peers = []
+            for dlat in (-1, 0, 1):
+                for dlng in (-1, 0, 1):
+                    neighbor_key = (bkey[0] + dlat, bkey[1] + dlng)
+                    for peer in buckets.get(neighbor_key, ()):
+                        if haversine_km(cell.grid_lat, cell.grid_lng, peer.grid_lat, peer.grid_lng) <= LOCAL_HOTSPOT_RADIUS_KM:
+                            local_peers.append(peer)
+
+            local_scores = sorted(c.demand_score for c in local_peers)
+            if not local_scores:
+                continue
+            idx = int(len(local_scores) * LOCAL_HOTSPOT_PERCENTILE)
+            idx = min(idx, len(local_scores) - 1)
+            local_threshold = local_scores[idx]
+            if cell.demand_score >= local_threshold and cell.demand_score > 0:
+                cell.is_hotspot = True
+                cell.checkout_eta_min = cell.prep_buffer_min + random.uniform(2, 5)
 
     def active_shadow_windows(self, hour: int, minute: int = 0) -> list:
         h_float = _hm_to_float(hour, minute)
@@ -1160,16 +1312,16 @@ class DemandSimulator:
         return active
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 7 â€” VELOCITY WAVE ENGINE  (FRONT-RUNNING OVERRIDE, v3.0)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 7 — VELOCITY WAVE ENGINE  (FRONT-RUNNING OVERRIDE, v3.0)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class VelocityWaveEngine:
     """
-    PURE PREDICTION â€” NOT REACTION.
+    PURE PREDICTION — NOT REACTION.
 
-    Ghost Penalty: zones already at demand_score â‰¥ 85 are PENALISED by 75%.
-      Rationale: mainstream platforms already display these as "surge" â€” they
+    Ghost Penalty: zones already at demand_score ≥ 85 are PENALISED by 75%.
+      Rationale: mainstream platforms already display these as "surge" — they
       are crowded ghost targets. Entering them gives zero competitive edge.
 
     Acceleration Multiplier: zones in the 40-75 "emerging" band receive a
@@ -1177,14 +1329,14 @@ class VelocityWaveEngine:
       competitor has seen it yet.
 
     TTA Lock: the engine targets cells where the rider's time-to-arrival
-      equals checkout_eta_min exactly â€” parked at the merchant's door the
+      equals checkout_eta_min exactly — parked at the merchant's door the
       millisecond the customer presses "Order".
     """
 
-    GHOST_SCORE_THRESHOLD = 85.0   # already peaked â†’ ghost penalty applies
+    GHOST_SCORE_THRESHOLD = 85.0   # already peaked → ghost penalty applies
     GHOST_MULTIPLIER      = 0.25   # 75% score cut for ghost zones
     EMERGING_BAND_LOW     = 40.0   # minimum score for "emerging" classification
-    EMERGING_BAND_HIGH    = 78.0   # ceiling â€” above this slides into ghost territory
+    EMERGING_BAND_HIGH    = 78.0   # ceiling — above this slides into ghost territory
     ACCEL_BONUS_MAX       = 2.0    # max acceleration multiplier at band centre
     ACCEL_BONUS_MIN       = 1.5    # multiplier at band entry (score=40)
     TTA_PRE_POSITION_WIN  = 3.0    # ideal: arrive 0-3 min before checkout_eta
@@ -1200,17 +1352,17 @@ class VelocityWaveEngine:
 
     def _acceleration_band(self, score: float, velocity: float = 0.0) -> tuple:
         """
-        v4.0 â€” Velocity Trend Validation Loop.
+        v4.0 — Velocity Trend Validation Loop.
 
         Ghost Penalty (Fading Surge):
-          score >= 85 AND velocity < STABLE_THRESHOLD â†’ 75% haircut.
-          Zone is dying â€” mainstream platforms are already swarming it.
+          score >= 85 AND velocity < STABLE_THRESHOLD → 75% haircut.
+          Zone is dying — mainstream platforms are already swarming it.
           Entering gives ZERO competitive edge; rider is ghost-chasing.
 
         Sustained Cash Cow Guard:
-          score >= 85 AND velocity >= STABLE_THRESHOLD â†’ NO haircut.
+          score >= 85 AND velocity >= STABLE_THRESHOLD → NO haircut.
           Deep market rush / downpour still actively driving transactions.
-          Zone is printing money â€” rider should STAY or re-enter.
+          Zone is printing money — rider should STAY or re-enter.
 
         Emerging Band (40-78):
           Pre-checkout explosion imminent. 1.5-2.0x multiplier locks rider
@@ -1218,12 +1370,12 @@ class VelocityWaveEngine:
         """
         if score >= self.GHOST_SCORE_THRESHOLD:
             if velocity >= VELOCITY_TREND_STABLE_THRESHOLD:
-                # Cash Cow Guard â€” velocity is stable/rising: suppress haircut
+                # Cash Cow Guard — velocity is stable/rising: suppress haircut
                 return 1.0, "SUSTAINED_CASH_COW"
-            # Fading Ghost â€” velocity is dropping: enforce 75% haircut
-            return self.GHOST_MULTIPLIER, "GHOST (already peaked â€” mainstream sees it)"
+            # Fading Ghost — velocity is dropping: enforce 75% haircut
+            return self.GHOST_MULTIPLIER, "GHOST (already peaked — mainstream sees it)"
         if score >= self.EMERGING_BAND_HIGH:
-            # Upper transition â€” still building, moderate acceleration bonus
+            # Upper transition — still building, moderate acceleration bonus
             fade = (score - self.EMERGING_BAND_HIGH) / (self.GHOST_SCORE_THRESHOLD - self.EMERGING_BAND_HIGH)
             mult = self.ACCEL_BONUS_MAX * (1.0 - fade * 0.5)
             return mult, "PEAKING"
@@ -1241,13 +1393,13 @@ class VelocityWaveEngine:
         Front-running composite score.
 
         TTA timing: ideal = arrive at checkout_eta_min (delta=0).
-          â€¢ Arriving 0-3 min BEFORE peak  â†’ full score + 10% pre-position bonus
-          â€¢ Arriving 0-5 min AFTER peak   â†’ decay (exp curve)
-          â€¢ Arriving more than 5 min late â†’ heavy decay (zone is dead)
+          • Arriving 0-3 min BEFORE peak  → full score + 10% pre-position bonus
+          • Arriving 0-5 min AFTER peak   → decay (exp curve)
+          • Arriving more than 5 min late → heavy decay (zone is dead)
 
-        Ghost penalty  â†’ zones already at peak get 75% score haircut.
-        Acceleration   â†’ emerging zones get 1.5-2.0x multiplier.
-        Velocity bonus â†’ cells with high demand_velocity (rising fast) get +20%.
+        Ghost penalty  → zones already at peak get 75% score haircut.
+        Acceleration   → emerging zones get 1.5-2.0x multiplier.
+        Velocity bonus → cells with high demand_velocity (rising fast) get +20%.
         """
         if cell.checkout_eta_min is None:
             return 0.0
@@ -1257,16 +1409,16 @@ class VelocityWaveEngine:
 
         # TTA timing score
         if delta <= 0 and delta >= -self.TTA_PRE_POSITION_WIN:
-            # Perfect: arrive 0-3 min before checkout fires â†’ maximum intercept
+            # Perfect: arrive 0-3 min before checkout fires → maximum intercept
             timing_score = 1.10 + 0.033 * abs(delta)   # slight bonus for being early
         elif delta < -self.TTA_PRE_POSITION_WIN:
-            # Too early â€” surge hasn't built yet
+            # Too early — surge hasn't built yet
             timing_score = math.exp(-0.06 * (abs(delta) - self.TTA_PRE_POSITION_WIN))
         elif 0 < delta <= 5:
-            # Slightly late â€” still catchable but losing edge
+            # Slightly late — still catchable but losing edge
             timing_score = math.exp(-0.18 * delta)
         else:
-            # More than 5 min late â€” zone is stale, mainstream already swarmed
+            # More than 5 min late — zone is stale, mainstream already swarmed
             timing_score = math.exp(-0.40 * (delta - 5))
 
         # Ghost penalty / acceleration multiplier (velocity-aware v4.0)
@@ -1293,9 +1445,9 @@ class VelocityWaveEngine:
         return scored[:top_n]
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 8 â€” LEAPFROG SEQUENTIAL ROUTER
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 8 — LEAPFROG SEQUENTIAL ROUTER
+# ══════════════════════════════════════════════════════════════════════════════
 
 class LeapfrogRouter:
     def __init__(self, grid: GridEngine, wave: VelocityWaveEngine,
@@ -1337,9 +1489,9 @@ class LeapfrogRouter:
         )
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 9 â€” RETURN TICKET ARBITRAGE
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9 — RETURN TICKET ARBITRAGE
+# ══════════════════════════════════════════════════════════════════════════════
 
 class ReturnTicketArbitrage:
     def __init__(self, grid: GridEngine, wave: VelocityWaveEngine):
@@ -1363,7 +1515,7 @@ class ReturnTicketArbitrage:
             return {
                 "zone": zone_name,
                 "alert": "RETURN_TICKET_ARBITRAGE",
-                "message": (f"Drop-off is in {zone_name} â€” low-density outskirt. "
+                "message": (f"Drop-off is in {zone_name} — low-density outskirt. "
                             f"Pre-lock B2B/wholesale return run from "
                             f"{best.grid_lat:.4f},{best.grid_lng:.4f} "
                             f"(base demand weight {best.base_weight:.0f})."),
@@ -1374,13 +1526,13 @@ class ReturnTicketArbitrage:
         return None
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 9.5 â€” CORPORATE ARBITRAGE ROUTER  (v4.0)
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9.5 — CORPORATE ARBITRAGE ROUTER  (v4.0)
 # Intercepts corporate landing zone exits and pre-populates outbound routing
 # vectors. Two activation windows:
 #   Mid-Morning Legal & Consular Push  10:00-11:30
 #   Pre-COB Crunch                     15:30-17:00  (Ministries cut off 16:30)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
 
 class CorporateArbitrageRouter:
     """
@@ -1394,7 +1546,7 @@ class CorporateArbitrageRouter:
 
     LEGAL_PUSH_WINDOW    = (10.0, 11.5)   # 10:00-11:30
     PRE_COB_WINDOW       = (15.5, 17.0)   # 15:30-17:00
-    MINISTRIES_CUTOFF    = 16.5           # 16:30 â€” Ministries hard close
+    MINISTRIES_CUTOFF    = 16.5           # 16:30 — Ministries hard close
     ACTIVATION_RADIUS_KM = 1.5            # rider must be within this of the zone
 
     def check(self, rider: RiderTelemetry, hour: int, minute: int,
@@ -1435,11 +1587,11 @@ class CorporateArbitrageRouter:
         if in_legal:
             flow_key = "A"     # Legal push always routes to courts
         elif "Airport City" in best_zone["name"]:
-            flow_key = "B"     # Airport City â†’ KIA / customs
+            flow_key = "B"     # Airport City → KIA / customs
         elif "Ministries" in best_zone["name"]:
-            flow_key = "A"     # Ministries â†’ High Street courts
+            flow_key = "A"     # Ministries → High Street courts
         else:
-            flow_key = "C"     # Ridge / others â†’ upcountry sorting
+            flow_key = "C"     # Ridge / others → upcountry sorting
 
         flow = CORPORATE_OUTBOUND_FLOWS[flow_key]
 
@@ -1469,13 +1621,13 @@ class CorporateArbitrageRouter:
         # Saturday reduced capacity note
         sat_note = ""
         if weekday == 5 and best_zone.get("saturday_capacity", 1.0) < 1.0:
-            sat_note = f" âš  Saturday â€” {best_zone['saturday_capacity']*100:.0f}% capacity."
+            sat_note = f" ⚠ Saturday — {best_zone['saturday_capacity']*100:.0f}% capacity."
 
         # Ministries deadline warning
         cutoff_note = ""
         if in_cob and "Ministries" in best_zone["name"]:
             mins_left = (self.MINISTRIES_CUTOFF - h_float) * 60
-            cutoff_note = f" âš  MINISTRIES CLOSES IN {mins_left:.0f}min â€” execute BEFORE 16:30."
+            cutoff_note = f" ⚠ MINISTRIES CLOSES IN {mins_left:.0f}min — execute BEFORE 16:30."
 
         window_type = "MID_MORNING_LEGAL_PUSH" if in_legal else "PRE_COB_CRUNCH"
 
@@ -1504,7 +1656,7 @@ class CorporateArbitrageRouter:
             "elevator_wait_min": best_zone["elevator_wait_min"],
             "saturday_capacity_pct": int(best_zone.get("saturday_capacity", 1.0) * 100),
             "message": (
-                f"[{window_type.replace('_', ' ')}] {flow['name']} â†’ {primary_dest['name']}. "
+                f"[{window_type.replace('_', ' ')}] {flow['name']} → {primary_dest['name']}. "
                 f"Pickup: {nearest_node['name'] if nearest_node else best_zone['name']}. "
                 f"Access: {nearest_node['access'] if nearest_node else 'main entrance'}. "
                 f"Non-riding overhead: {total_overhead_min:.0f}min "
@@ -1516,9 +1668,9 @@ class CorporateArbitrageRouter:
         }
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 10 â€” WAYBILL PIPELINE INTERCEPTOR  (exact terminal schedules, v4.0)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 10 — WAYBILL PIPELINE INTERCEPTOR  (exact terminal schedules, v4.0)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class WaybillInterceptor:
     """
@@ -1603,9 +1755,9 @@ class WaybillInterceptor:
 
         bear = bearing_deg(rider.lat, rider.lng,
                            best_terminal["lat"], best_terminal["lng"])
-        stacking_note = " PEAK STACKING ACTIVE â€” multi-bus arrival cluster." \
+        stacking_note = " PEAK STACKING ACTIVE — multi-bus arrival cluster." \
             if best_meta["stacking"] else ""
-        weekend_note = f" Weekend demand Ã—{best_meta['weekend_mult']:.1f}." \
+        weekend_note = f" Weekend demand ×{best_meta['weekend_mult']:.1f}." \
             if best_meta["weekend_mult"] > 1.0 else ""
 
         return {
@@ -1624,9 +1776,9 @@ class WaybillInterceptor:
         }
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 11 â€” MONSOON MICRO-CLIMATE MULTIPLIER
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 11 — MONSOON MICRO-CLIMATE MULTIPLIER
+# ══════════════════════════════════════════════════════════════════════════════
 
 class MonsoonLayer:
     def __init__(self, grid: GridEngine):
@@ -1668,80 +1820,80 @@ class MonsoonLayer:
             "message": (f"Rain blocking {', '.join(rain_active_zones)}. "
                         f"Courier deficit spiking at dry edge "
                         f"{dist:.1f}km {compass_label(bear)}. "
-                        f"Move there NOW â€” demand multiplier 2x."),
+                        f"Move there NOW — demand multiplier 2x."),
         }
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 12 â€” PREDICTIVE HOLD STATE MACHINE
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 12 — PREDICTIVE HOLD STATE MACHINE
+# ══════════════════════════════════════════════════════════════════════════════
 
 class PredictiveHoldSM:
     """
     Fuel-cost vs. intercept-probability gate. States: MOVE | MOVE_CAUTIOUS | HOLD | CHARGE.
 
-    v4.2 CHANGE â€” the original version defaulted to HOLD any time the best
+    v4.2 CHANGE — the original version defaulted to HOLD any time the best
     available zone fell short of MIN_PROFIT_THRESHOLD or the confidence
     floor. In practice this is wrong: a rider standing still earns exactly
     GHS 0.00/hour. A zone projecting GHS 3.50 (just under the old GHS 4.00
     cliff) still beats standing still, AND moving keeps the rider in
-    position to catch the next real surge as conditions change â€” standing
+    position to catch the next real surge as conditions change — standing
     still doesn't. HOLD is now reserved for situations where moving is
     genuinely the wrong call (fuel-critical, deep overnight, or truly
-    nothing in range at all) â€” not just "the best option isn't great."
+    nothing in range at all) — not just "the best option isn't great."
 
-    Returns (should_hold: bool, reason: str, degraded: bool) â€” degraded=True
+    Returns (should_hold: bool, reason: str, degraded: bool) — degraded=True
     means "moving, but be honest this isn't a top-tier call" so the
     frontend can show it differently from a confident MOVE.
     """
 
     # Below this net yield, moving is still allowed but flagged as a
     # low-confidence move rather than presented as a strong recommendation.
-    DEGRADED_PROFIT_FLOOR = 1.00   # GHS â€” below THIS, genuinely not worth the fuel
+    DEGRADED_PROFIT_FLOOR = 1.00   # GHS — below THIS, genuinely not worth the fuel
     DEGRADED_CONFIDENCE_FLOOR = 0.12  # below this, the signal is closer to noise than data
 
     def evaluate(self, rider: RiderTelemetry, primary_vector: Optional[DriftVector],
                  hour: int) -> tuple:
         if rider.fuel_level_pct < 15:
-            return True, "CHARGE â€” fuel critically low (<15%). Locate nearest fuel station.", False
+            return True, "CHARGE — fuel critically low (<15%). Locate nearest fuel station.", False
 
         if primary_vector is None:
-            return True, ("HOLD â€” nothing in range at all right now. "
-                          "Save fuel. Stand by â€” this will refresh as soon as something appears."), False
+            return True, ("HOLD — nothing in range at all right now. "
+                          "Save fuel. Stand by — this will refresh as soon as something appears."), False
 
         fuel_cost = primary_vector.distance_km * FUEL_COST_GHS_PER_KM
         net_yield = primary_vector.expected_yield_ghs - fuel_cost
 
         # Only a genuinely worthless move (net yield below fuel cost itself,
-        # or near-zero signal) gets vetoed into HOLD. Everything else moves â€”
+        # or near-zero signal) gets vetoed into HOLD. Everything else moves —
         # just labeled honestly if it's a long shot rather than a sure thing.
         if net_yield < self.DEGRADED_PROFIT_FLOOR and primary_vector.confidence < self.DEGRADED_CONFIDENCE_FLOOR:
-            return True, (f"HOLD â€” best option nets only GHS {net_yield:.2f} after fuel, "
+            return True, (f"HOLD — best option nets only GHS {net_yield:.2f} after fuel, "
                           f"with very low confidence ({primary_vector.confidence:.0%}). "
                           f"Genuinely not worth the trip. Wait for a stronger signal."), False
 
         if 23 <= hour or hour < 5:
-            return True, "HOLD â€” low overnight demand. Rest until 05:00.", False
+            return True, "HOLD — low overnight demand. Rest until 05:00.", False
 
         if net_yield < MIN_PROFIT_THRESHOLD or primary_vector.confidence < 0.30:
             # Below the "ideal" bar, but still positive expected value and
-            # not zero-confidence noise â€” move, but say so honestly.
-            return False, (f"MOVE (long shot) â€” projected GHS {net_yield:.2f} net, "
+            # not zero-confidence noise — move, but say so honestly.
+            return False, (f"MOVE (long shot) — projected GHS {net_yield:.2f} net, "
                            f"{primary_vector.confidence:.0%} confidence. Below our usual bar, "
                            f"but still beats standing still. Your call."), True
 
         return False, "", False
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 13 â€” ADAPTIVE POLLER  (kinematic battery & data optimizer)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 13 — ADAPTIVE POLLER  (kinematic battery & data optimizer)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class AdaptivePoller:
     """
-    STATIONARY  (speed â‰¤ 2 km/h or HOLD)  â†’ 90-120s  (battery saver)
-    CRUISING    (speed 3-20 km/h)          â†’ 25-35s   (standard tracking)
-    INTERCEPTING (speed > 20 + confâ‰¥0.55)  â†’ 8-10s    (precision mode)
+    STATIONARY  (speed ≤ 2 km/h or HOLD)  → 90-120s  (battery saver)
+    CRUISING    (speed 3-20 km/h)          → 25-35s   (standard tracking)
+    INTERCEPTING (speed > 20 + conf≥0.55)  → 8-10s    (precision mode)
     """
 
     STATIONARY_RANGE  = (90, 120)
@@ -1761,15 +1913,15 @@ class AdaptivePoller:
     @staticmethod
     def label(interval: int) -> str:
         if interval >= 90:
-            return "STATIONARY â€” battery saver mode"
+            return "STATIONARY — battery saver mode"
         if interval <= 10:
-            return "INTERCEPT â€” high-precision tracking"
-        return "CRUISING â€” standard tracking"
+            return "INTERCEPT — high-precision tracking"
+        return "CRUISING — standard tracking"
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 14 â€” BOOSTER ENGINE  (main orchestrator, v4.0)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 14 — BOOSTER ENGINE  (main orchestrator, v4.0)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class BoosterEngine:
     def __init__(self, places_path: str = "places.json"):
@@ -1801,19 +1953,19 @@ class BoosterEngine:
 
         # Infer weekday if not supplied
         if weekday is None:
-            weekday = datetime.datetime.now().weekday()  # 0=Monâ€¦6=Sun
+            weekday = datetime.datetime.now().weekday()  # 0=Mon…6=Sun
 
-        # â”€â”€ 0. Predictive front-runner: advance wall-clock by PREDICTIVE_OFFSET_MINS
+        # ── 0. Predictive front-runner: advance wall-clock by PREDICTIVE_OFFSET_MINS
         #    Demand signals are scored against WHERE THE MARKET WILL BE, not where it is.
         #    Corp/waybill/hold logic continues to use the real clock (window-based gates).
         future_h, future_m = _offset_time(hour, minute, PREDICTIVE_OFFSET_MINS)
 
-        # â”€â”€ 1. Inject demand signals at FUTURE time (+15 min offset)
+        # ── 1. Inject demand signals at FUTURE time (+15 min offset)
         self.demand.inject_signals(future_h, minute=future_m,
                                    simulate_hotspots=simulate_hotspots,
                                    weekday=weekday)
 
-        # â”€â”€ 1b. Apply external match telemetry weight overrides (rider feedback loop)
+        # ── 1b. Apply external match telemetry weight overrides (rider feedback loop)
         if cell_weight_overrides:
             for cell in self.grid.cells.values():
                 key = (round(cell.grid_lat, GRID_RESOLUTION),
@@ -1822,14 +1974,14 @@ class BoosterEngine:
                 if mod is not None and mod != 1.0:
                     cell.demand_score = max(0.0, cell.demand_score * mod)
 
-        # â”€â”€ 2. Candidate hotspot cells within rider's search radius
+        # ── 2. Candidate hotspot cells within rider's search radius
         nearby = self.grid.nearby_cells(rider.lat, rider.lng, search_radius_km)
         hotspot_cells = [c for c in nearby if c.is_hotspot]
 
-        # â”€â”€ 3. Rank by front-running intercept score (future time window)
+        # ── 3. Rank by front-running intercept score (future time window)
         ranked = self.wave.rank_cells(rider, hotspot_cells, future_h, future_m, top_n=5)
 
-        # â”€â”€ 4. Build primary drift vector
+        # ── 4. Build primary drift vector
         primary_vector = None
         ghost_penalty_applied = False
         top_band = "N/A"
@@ -1859,7 +2011,7 @@ class BoosterEngine:
             # Event friction advisory (Action Chapel / Spintex gridlock)
             evt_friction = self.friction.event_friction_info(
                 rider.lat, rider.lng, hour, minute, weekday)
-            evt_note = (f" âš¡ EVENT FRICTION: {evt_friction['zone']} â€” "
+            evt_note = (f" ⚡ EVENT FRICTION: {evt_friction['zone']} — "
                         f"{evt_friction['event']} gridlock ({evt_friction['penalty']*100:.0f}% "
                         f"speed loss, {evt_friction['dist_km']}km away)."
                         if evt_friction else "")
@@ -1878,17 +2030,17 @@ class BoosterEngine:
                 reason=(
                     f"[{top_band}] Surge wave peaking in {top_cell.checkout_eta_min:.0f}min "
                     f"at {top_cell.grid_lat:.4f},{top_cell.grid_lng:.4f}. "
-                    f"Head {compass_label(bear)} â€” arrive in {tta:.0f}min. "
+                    f"Head {compass_label(bear)} — arrive in {tta:.0f}min. "
                     f"Road: {road_label}. "
                     f"Traffic friction: {(1-friction_mult)*100:.0f}% total degradation."
                     f"{evt_note}{corp_note}"
                 ),
             )
 
-        # â”€â”€ 5. Hold state machine
+        # ── 5. Hold state machine
         hold, hold_reason, move_degraded = self.hold_sm.evaluate(rider, primary_vector, hour)
 
-        # â”€â”€ 6. HotSpot summary objects
+        # ── 6. HotSpot summary objects
         hotspots_out = []
         for score, cell in ranked[:3]:
             cat_counter = defaultdict(int)
@@ -1898,7 +2050,7 @@ class BoosterEngine:
             dist_km = haversine_km(rider.lat, rider.lng, cell.grid_lat, cell.grid_lng)
             # Decay curve, not linear fuel-only deduction: a zone twice as
             # far needs meaningfully higher demand/confidence to score the
-            # same â€” addresses riders being sent unnecessarily far for only
+            # same — addresses riders being sent unnecessarily far for only
             # a marginal yield edge over something closer.
             distance_factor = 1 / (1 + dist_km) ** 1.5
             raw_opportunity = (cell.demand_score * 0.5 + cell.surge_probability * 100 * 0.5) * distance_factor
@@ -1915,8 +2067,8 @@ class BoosterEngine:
                 opportunity_score=round(min(100, max(0, raw_opportunity)), 1),
             ))
 
-        # â”€â”€ 6.5 Nearby pick: closest of the top-3 that still clears the
-        # yield floor â€” gives the rider a short-trip option alongside the
+        # ── 6.5 Nearby pick: closest of the top-3 that still clears the
+        # yield floor — gives the rider a short-trip option alongside the
         # best-overall pick, instead of only ever pointing at the highest
         # yield regardless of distance.
         nearby_pick = None
@@ -1930,7 +2082,7 @@ class BoosterEngine:
                 "distance_km": round(haversine_km(rider.lat, rider.lng, nearest_cell.grid_lat, nearest_cell.grid_lng), 2),
             }
 
-        # â”€â”€ 6.6 Current location score: demand right where the rider is
+        # ── 6.6 Current location score: demand right where the rider is
         # standing RIGHT NOW, for a direct "here vs there" comparison. If
         # the rider's exact cell isn't indexed (no places nearby), this is
         # honestly None rather than a fabricated number.
@@ -1943,25 +2095,25 @@ class BoosterEngine:
                 "label": ", ".join(p["name"] for p in current_cell.places[:2]) or "Your area",
             }
 
-        # â”€â”€ 7. Leapfrog
+        # ── 7. Leapfrog
         leapfrog_vector = self.leapfrog.next_zone(rider, hour, minute)
 
-        # â”€â”€ 8. Return ticket arbitrage
+        # ── 8. Return ticket arbitrage
         arb_alert = self.arbitrage.check(rider, hour)
 
-        # â”€â”€ 9. Waybill intercept
+        # ── 9. Waybill intercept
         waybill_alert = self.waybill.check(rider, hour, minute, weekday)
 
-        # â”€â”€ 9.5. Corporate arbitrage (v4.0)
+        # ── 9.5. Corporate arbitrage (v4.0)
         corp_arb_alert = self.corp_arb.check(rider, hour, minute, weekday)
 
-        # â”€â”€ 10. Monsoon layer
+        # ── 10. Monsoon layer
         weather_advisory = self.monsoon.apply(rider, rain_active_zones or [], hour)
 
-        # â”€â”€ 11. Adaptive poll interval
+        # ── 11. Adaptive poll interval
         poll_interval = self.poller.compute(rider, hold, primary_vector)
 
-        # â”€â”€ 12. Grid stats
+        # ── 12. Grid stats
         active_cells   = [c for c in nearby if c.demand_score > 0]
         avg_score      = (sum(c.demand_score for c in active_cells) / len(active_cells)
                           if active_cells else 0)
@@ -1977,7 +2129,7 @@ class BoosterEngine:
         cash_cow_count = sum(1 for c in hotspot_cells
                              if c.demand_score >= VelocityWaveEngine.GHOST_SCORE_THRESHOLD
                              and c.demand_velocity >= VELOCITY_TREND_STABLE_THRESHOLD)
-        # v4.0 â€” megachurch event waves currently firing
+        # v4.0 — megachurch event waves currently firing
         megachurch_active = self.demand._megachurch_event_boost(hour, minute, weekday)
         megachurch_names  = [s[4] for s in megachurch_active]
         event_fric = self.friction.event_friction_info(
@@ -2006,7 +2158,7 @@ class BoosterEngine:
             "megachurch_events_active":   megachurch_names[:4],
             "event_friction":             event_fric,
             "weekday":                    weekday,
-            # v4.1 â€” External Positioning Overlay / Predictive Front-Runner
+            # v4.1 — External Positioning Overlay / Predictive Front-Runner
             "predictive_offset_mins":     PREDICTIVE_OFFSET_MINS,
             "scored_at_future_hour":      future_h,
             "scored_at_future_min":       future_m,
@@ -2033,13 +2185,13 @@ class BoosterEngine:
         )
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# SECTION 17 â€” CONSOLE SIMULATION DEMO  (v4.0 â€” 7 scenarios)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 17 — CONSOLE SIMULATION DEMO  (v4.0 — 7 scenarios)
+# ══════════════════════════════════════════════════════════════════════════════
 
-def _divider(char="â•", width=72): print(char * width)
+def _divider(char="═", width=72): print(char * width)
 def _title(t): _divider(); print(f"  {t}"); _divider()
-def _section(t): print(f"\n  â”€â”€ {t} " + "â”€" * (65 - len(t)))
+def _section(t): print(f"\n  ── {t} " + "─" * (65 - len(t)))
 
 
 def _print_vector(label, v):
@@ -2049,7 +2201,7 @@ def _print_vector(label, v):
     print(f"    {label}:")
     print(f"      Action     : {v['action']}")
     print(f"      Target     : {v['target_lat']:.4f}, {v['target_lng']:.4f}")
-    print(f"      Bearing    : {v['bearing_deg']:.1f}Â° ({compass_label(v['bearing_deg'])})")
+    print(f"      Bearing    : {v['bearing_deg']:.1f}° ({compass_label(v['bearing_deg'])})")
     print(f"      Distance   : {v['distance_km']} km")
     print(f"      TTA        : {v['tta_min']} min")
     print(f"      Yield Est  : GHS {v['expected_yield_ghs']:.2f}")
@@ -2066,30 +2218,30 @@ def _print_grid(g, poll_interval):
     print(f"    Road surface        : {g['road_surface']}")
     print(f"    Shadow windows      : {g['shadow_windows_firing']} firing")
     for sw in g['shadow_matrix_active'][:4]:
-        print(f"                          â€¢ {sw}")
-    print(f"    â”€â”€ FRONT-RUNNING ENGINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+        print(f"                          • {sw}")
+    print(f"    ── FRONT-RUNNING ENGINE ─────────────────────────────────")
     print(f"    Top zone band       : {g['top_zone_band']}")
-    print(f"    Ghost penalty       : {'YES â€” competitive dead zone suppressed' if g['ghost_penalty_applied'] else 'NO â€” clean target'}")
-    print(f"    Emerging cells      : {g['emerging_cells']}  â† pre-checkout explosion targets")
-    print(f"    Ghost cells suppressed: {g['ghost_cells_suppressed']}  â† mainstream already sees these")
-    print(f"    â”€â”€ ADAPTIVE POLL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€")
+    print(f"    Ghost penalty       : {'YES — competitive dead zone suppressed' if g['ghost_penalty_applied'] else 'NO — clean target'}")
+    print(f"    Emerging cells      : {g['emerging_cells']}  ← pre-checkout explosion targets")
+    print(f"    Ghost cells suppressed: {g['ghost_cells_suppressed']}  ← mainstream already sees these")
+    print(f"    ── ADAPTIVE POLL ────────────────────────────────────────")
     print(f"    Next poll in        : {poll_interval}s")
     print(f"    Mode                : {g['poll_mode']}")
 
 
 def run_simulation():
-    _title("FalconFX BOOSTER v4.0 â€” Asymmetric Companion Weapon  |  Console Simulation")
+    _title("FalconFX BOOSTER v4.0 — Asymmetric Companion Weapon  |  Console Simulation")
 
     engine = BoosterEngine("places.json")
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 1 â€” Front-Running Override: Evening peak, Osu cluster
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 1 — Front-Running Override: Evening peak, Osu cluster
     # Demonstrates: ghost penalty suppression + emerging band targeting
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    print("  SCENARIO 1 â€” Front-Running Override: Evening Peak, Osu/Airport")
+    # ══════════════════════════════════════════════════════════════════════════
+    print("  SCENARIO 1 — Front-Running Override: Evening Peak, Osu/Airport")
     print("  Rider: Airport Residential, 28 km/h SE. Time: 18:12 (peak dinner)")
-    print("  Proves: engine ignores already-peaked ghost zones â†’ targets EMERGING cells")
-    _divider("â”€")
+    print("  Proves: engine ignores already-peaked ghost zones → targets EMERGING cells")
+    _divider("─")
 
     rider1 = RiderTelemetry(
         lat=5.605, lng=-0.173, speed_kmh=28, heading_deg=135,
@@ -2109,8 +2261,8 @@ def run_simulation():
     )
 
     _section("RIDER STATE")
-    print(f"    Position   : {rider1.lat}Â°N, {rider1.lng}Â°E")
-    print(f"    Speed      : {rider1.speed_kmh} km/h  |  Heading: {rider1.heading_deg}Â° {compass_label(rider1.heading_deg)}")
+    print(f"    Position   : {rider1.lat}°N, {rider1.lng}°E")
+    print(f"    Speed      : {rider1.speed_kmh} km/h  |  Heading: {rider1.heading_deg}° {compass_label(rider1.heading_deg)}")
     print(f"    Fuel       : {rider1.fuel_level_pct}%")
 
     _section("GRID REPORT + FRONT-RUNNING INTELLIGENCE")
@@ -2126,7 +2278,7 @@ def run_simulation():
         print(f"        {hs['label']}")
 
     _section("HOLD STATE MACHINE")
-    status = "ðŸ›‘ HOLD" if out1.hold_recommended else ("âš ï¸ MOVE (long shot)" if out1.move_degraded else "âœ… MOVE")
+    status = "🛑 HOLD" if out1.hold_recommended else ("⚠️ MOVE (long shot)" if out1.move_degraded else "✅ MOVE")
     print(f"    Recommendation: {status}")
     if out1.hold_reason:
         print(f"    Reason: {out1.hold_reason}")
@@ -2136,25 +2288,25 @@ def run_simulation():
 
     _section("WAYBILL INTERCEPT")
     if out1.waybill_alert:
-        print(f"    âš¡ {out1.waybill_alert['message']}")
+        print(f"    ⚡ {out1.waybill_alert['message']}")
     else:
         print("    No waybill window active.")
 
     _section("WEATHER ADVISORY")
     if out1.weather_advisory:
-        print(f"    ðŸŒ§  {out1.weather_advisory['message']}")
+        print(f"    🌧  {out1.weather_advisory['message']}")
     else:
         print("    Clear conditions.")
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 2 â€” Waybill Intercept: Friday Morning, Kaneshie Terminal
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 2 — Waybill Intercept: Friday Morning, Kaneshie Terminal
     # Demonstrates: weekend_multiplier + peak stacking + STC vs first-come
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ══════════════════════════════════════════════════════════════════════════
     print("\n\n")
-    _title("SCENARIO 2 â€” Waybill Intercept: Friday AM, Kaneshie + Rain Displacement")
+    _title("SCENARIO 2 — Waybill Intercept: Friday AM, Kaneshie + Rain Displacement")
     print("  Rider: near Madina, active delivery to Adenta. Time: 07:22 Friday")
     print("  Proves: Fri multiplier on Kaneshie terminal + rain dry-edge surge")
-    _divider("â”€")
+    _divider("─")
 
     rider2 = RiderTelemetry(
         lat=5.680, lng=-0.168, speed_kmh=38, heading_deg=10,
@@ -2171,26 +2323,26 @@ def run_simulation():
     )
 
     _section("RIDER STATE")
-    print(f"    Position   : {rider2.lat}Â°N, {rider2.lng}Â°E")
-    print(f"    Delivering : YES â†’ {rider2.dropoff_lat},{rider2.dropoff_lng} (Adenta)")
-    print(f"    Speed      : {rider2.speed_kmh} km/h | Heading: {rider2.heading_deg}Â° {compass_label(rider2.heading_deg)}")
+    print(f"    Position   : {rider2.lat}°N, {rider2.lng}°E")
+    print(f"    Delivering : YES → {rider2.dropoff_lat},{rider2.dropoff_lng} (Adenta)")
+    print(f"    Speed      : {rider2.speed_kmh} km/h | Heading: {rider2.heading_deg}° {compass_label(rider2.heading_deg)}")
 
     _section("GRID REPORT + FRONT-RUNNING")
     _print_grid(out2.grid_stats, out2.next_poll_interval_seconds)
 
-    _section("LEAPFROG â€” Post Drop-off Pre-cache")
+    _section("LEAPFROG — Post Drop-off Pre-cache")
     _print_vector("Leapfrog", out2.leapfrog_vector)
 
     _section("RETURN TICKET ARBITRAGE")
     if out2.arbitrage_alert:
-        print(f"    ðŸ“¦ {out2.arbitrage_alert['message']}")
+        print(f"    📦 {out2.arbitrage_alert['message']}")
     else:
         print("    No arbitrage opportunity.")
 
     _section("WAYBILL INTERCEPT  [FRIDAY MULTIPLIER]")
     if out2.waybill_alert:
         w = out2.waybill_alert
-        print(f"    âš¡ {w['message']}")
+        print(f"    ⚡ {w['message']}")
         print(f"       Terminal type : {w['terminal_type']}")
         print(f"       Next arrival  : {w['next_arrival_min']} min")
     else:
@@ -2198,19 +2350,19 @@ def run_simulation():
 
     _section("MONSOON DRY-EDGE ADVISORY")
     if out2.weather_advisory:
-        print(f"    ðŸŒ§  {out2.weather_advisory['message']}")
+        print(f"    🌧  {out2.weather_advisory['message']}")
     else:
         print("    No rain displacement.")
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 3 â€” B2B Wholesale: Wednesday Makola + Kantamanto Run
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 3 — B2B Wholesale: Wednesday Makola + Kantamanto Run
     # Demonstrates: day-of-week B2B injection, AMA Clamp, pedestrian penalty
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ══════════════════════════════════════════════════════════════════════════
     print("\n\n")
-    _title("SCENARIO 3 â€” B2B Wholesale Wednesday: Makola + Kantamanto")
+    _title("SCENARIO 3 — B2B Wholesale Wednesday: Makola + Kantamanto")
     print("  Rider: near Accra Central, 08:15 Wednesday (maximum restock day)")
     print("  Proves: B2B day_weight 1.5-1.8x, AMA Clamp Risk, pedestrian friction")
-    _divider("â”€")
+    _divider("─")
 
     rider3 = RiderTelemetry(
         lat=5.555, lng=-0.207, speed_kmh=18, heading_deg=45,
@@ -2225,14 +2377,14 @@ def run_simulation():
     )
 
     _section("RIDER STATE")
-    print(f"    Position   : {rider3.lat}Â°N, {rider3.lng}Â°E  (Accra Central / Makola)")
+    print(f"    Position   : {rider3.lat}°N, {rider3.lng}°E  (Accra Central / Makola)")
     print(f"    Speed      : {rider3.speed_kmh} km/h")
 
     _section("GRID REPORT + FRONT-RUNNING")
     _print_grid(out3.grid_stats, out3.next_poll_interval_seconds)
 
     _section("HOLD / MOVE")
-    status3 = "ðŸ›‘ HOLD" if out3.hold_recommended else "âœ… MOVE"
+    status3 = "🛑 HOLD" if out3.hold_recommended else "✅ MOVE"
     print(f"    Recommendation: {status3}")
     if out3.hold_reason:
         print(f"    Reason: {out3.hold_reason}")
@@ -2246,14 +2398,14 @@ def run_simulation():
               f"score={hs['demand_score']:.1f}  "
               f"band={hs['acceleration_band']}")
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 4 â€” Predictive HOLD: Tema outskirts, 14:30 inter-peak
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 4 — Predictive HOLD: Tema outskirts, 14:30 inter-peak
     # Demonstrates: fuel cost > yield, HOLD, battery saver
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ══════════════════════════════════════════════════════════════════════════
     print("\n\n")
-    _title("SCENARIO 4 â€” Predictive HOLD: fuel cost > yield (Tema outskirts)")
+    _title("SCENARIO 4 — Predictive HOLD: fuel cost > yield (Tema outskirts)")
     print("  Rider: Tema, 14:30, low inter-peak demand. Fuel 42%.")
-    _divider("â”€")
+    _divider("─")
 
     rider4 = RiderTelemetry(
         lat=5.673, lng=0.013, speed_kmh=5, heading_deg=270,
@@ -2274,28 +2426,28 @@ def run_simulation():
     print(f"    Avg demand score  : {g4['avg_demand_score']}")
     print(f"    Emerging cells    : {g4['emerging_cells']} (pre-checkout targets)")
     print(f"    Ghost cells       : {g4['ghost_cells_suppressed']} (suppressed)")
-    print(f"    Next poll         : {out4.next_poll_interval_seconds}s â† battery saver")
+    print(f"    Next poll         : {out4.next_poll_interval_seconds}s ← battery saver")
     print(f"    Mode              : {g4['poll_mode']}")
 
     _section("HOLD STATE MACHINE")
-    status4 = "ðŸ›‘ HOLD" if out4.hold_recommended else "âœ… MOVE"
+    status4 = "🛑 HOLD" if out4.hold_recommended else "✅ MOVE"
     print(f"    Recommendation: {status4}")
     if out4.hold_reason:
         print(f"    Reason: {out4.hold_reason}")
 
     if out4.primary_vector:
-        _section("PRIMARY DRIFT VECTOR (low confidence â€” for reference)")
+        _section("PRIMARY DRIFT VECTOR (low confidence — for reference)")
         _print_vector("Primary", out4.primary_vector)
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 5 â€” Night Market: Osu Oxford St, 21:00 (G&G + Osu Blue Gate)
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 5 — Night Market: Osu Oxford St, 21:00 (G&G + Osu Blue Gate)
     # Demonstrates: night food wave, Shadow Matrix peak 20:00-23:00
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # ══════════════════════════════════════════════════════════════════════════
     print("\n\n")
-    _title("SCENARIO 5 â€” Osu Night Market: G&G Special + Blue Gate, 21:00")
+    _title("SCENARIO 5 — Osu Night Market: G&G Special + Blue Gate, 21:00")
     print("  Rider: near Labone, 21:00 Saturday. Night-market wave ACTIVE.")
     print("  Proves: Oxford St/Osu night cluster (20-23h) + Tetteh Quarshie avoided")
-    _divider("â”€")
+    _divider("─")
 
     rider5 = RiderTelemetry(
         lat=5.576, lng=-0.166, speed_kmh=32, heading_deg=90,
@@ -2310,18 +2462,18 @@ def run_simulation():
     )
 
     _section("RIDER STATE")
-    print(f"    Position   : {rider5.lat}Â°N, {rider5.lng}Â°E  (Labone area)")
-    print(f"    Speed      : {rider5.speed_kmh} km/h | Heading: {rider5.heading_deg}Â° {compass_label(rider5.heading_deg)}")
+    print(f"    Position   : {rider5.lat}°N, {rider5.lng}°E  (Labone area)")
+    print(f"    Speed      : {rider5.speed_kmh} km/h | Heading: {rider5.heading_deg}° {compass_label(rider5.heading_deg)}")
 
     _section("GRID REPORT + FRONT-RUNNING")
     _print_grid(out5.grid_stats, out5.next_poll_interval_seconds)
 
     _section("NIGHT SHADOW MATRIX (active windows 21:00)")
     for sw in out5.grid_stats['shadow_matrix_active'][:8]:
-        print(f"    â€¢ {sw}")
+        print(f"    • {sw}")
 
     _section("HOLD / MOVE")
-    status5 = "ðŸ›‘ HOLD" if out5.hold_recommended else "âœ… MOVE"
+    status5 = "🛑 HOLD" if out5.hold_recommended else "✅ MOVE"
     print(f"    Recommendation: {status5}")
     if out5.hold_reason:
         print(f"    Reason: {out5.hold_reason}")
@@ -2340,17 +2492,17 @@ def run_simulation():
 
     _section("WAYBILL")
     if out5.waybill_alert:
-        print(f"    âš¡ {out5.waybill_alert['message']}")
+        print(f"    ⚡ {out5.waybill_alert['message']}")
     else:
         print("    No waybill window at 21:00.")
 
-    # SCENARIO 6 â€” Mega-Church Spatial Wave: Action Chapel Sunday 2nd Dismissal
+    # SCENARIO 6 — Mega-Church Spatial Wave: Action Chapel Sunday 2nd Dismissal
     # Rider near Spintex Rd, 10:52 Sunday (weekday=6)
     # Expected: massive demand spike injected near Action Chapel (capacity 30,000)
     #           Spintex event friction advisory fires
     #           top_zone_band reflects velocity spike from synchronized exit
 
-    _title("SCENARIO 6 â€” Mega-Church Wave: Action Chapel Spintex, Sunday 10:52")
+    _title("SCENARIO 6 — Mega-Church Wave: Action Chapel Spintex, Sunday 10:52")
 
     rider6 = RiderTelemetry(
         lat=5.618, lng=-0.111,   # ~1.4km from Action Chapel Impact Arena
@@ -2367,13 +2519,13 @@ def run_simulation():
     if out6.primary_vector:
         pv = out6.primary_vector
         print(f"    Action  : {pv['action']}")
-        print(f"    Bearing : {pv['bearing_deg']}Â° â€” {compass_label(pv['bearing_deg'])}")
+        print(f"    Bearing : {pv['bearing_deg']}° — {compass_label(pv['bearing_deg'])}")
         print(f"    TTA     : {pv['tta_min']}min  Dist: {pv['distance_km']}km")
         print(f"    Yield   : GHS {pv['expected_yield_ghs']}")
         print(f"    Band    : {pv['confidence']:.0%} confidence")
         print(f"    Reason  : {pv['reason'][:180]}")
 
-    _section("GRID STATS â€” v4.0 Mega-Church Fields")
+    _section("GRID STATS — v4.0 Mega-Church Fields")
     g6 = out6.grid_stats
     print(f"    Top band              : {g6['top_zone_band']}")
     print(f"    Cash cow active       : {g6.get('cash_cow_guard_active')}")
@@ -2390,10 +2542,10 @@ def run_simulation():
               f"band={hs['acceleration_band']}")
         print(f"        {hs['label']}")
 
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # SCENARIO 7 â€” Corporate Arbitrage: Pre-COB Crunch, Ridge, 15:45 Thursday
+    # ══════════════════════════════════════════════════════════════════════════
+    # SCENARIO 7 — Corporate Arbitrage: Pre-COB Crunch, Ridge, 15:45 Thursday
 
-    _title("SCENARIO 7 â€” Corporate Arbitrage: Pre-COB Crunch, North Ridge, Thu 15:45")
+    _title("SCENARIO 7 — Corporate Arbitrage: Pre-COB Crunch, North Ridge, Thu 15:45")
 
     rider7 = RiderTelemetry(
         lat=5.576, lng=-0.193,   # inside North Ridge Corporate Enclave radius
@@ -2412,11 +2564,11 @@ def run_simulation():
         print(f"    Alert     : {ca['alert']}")
         print(f"    Window    : {ca['window_type']}")
         print(f"    Zone      : {ca['zone']}")
-        print(f"    Flow      : {ca['flow']} â€” {ca['flow_name']}")
+        print(f"    Flow      : {ca['flow']} — {ca['flow_name']}")
         print(f"    Pickup    : {ca['pickup_node']}")
         print(f"    Access    : {ca['pickup_access']}")
-        print(f"    Bearing â†’ : {ca['bearing_to_pickup']}Â°  ({ca['dist_to_pickup_km']}km)")
-        print(f"    â†’ Dest    : {ca['primary_destination']}")
+        print(f"    Bearing → : {ca['bearing_to_pickup']}°  ({ca['dist_to_pickup_km']}km)")
+        print(f"    → Dest    : {ca['primary_destination']}")
         print(f"    Overhead  : {ca['non_riding_overhead_min']}min total")
         print(f"              : gate={ca['gate_screening_min']}min + "
               f"walk={ca['walk_distance_m']}m + lift={ca['elevator_wait_min']}min")
@@ -2439,14 +2591,14 @@ def run_simulation():
     print(f"    3. B2B Wholesale Wednesday (Makola + Kantamanto)")
     print(f"    4. Predictive HOLD: fuel cost > yield (Tema outskirts)")
     print(f"    5. Night Market: Osu Oxford St 21:00")
-    print(f"    6. â˜… Mega-Church Spatial Wave: Action Chapel Spintex Sunday 10:52")
-    print(f"    7. â˜… Corporate Arbitrage: Pre-COB Crunch Ridge Thursday 15:45")
-    print(f"  FastAPI â†’ python3 api.py  |  POST /booster/compute")
+    print(f"    6. ★ Mega-Church Spatial Wave: Action Chapel Spintex Sunday 10:52")
+    print(f"    7. ★ Corporate Arbitrage: Pre-COB Crunch Ridge Thursday 15:45")
+    print(f"  FastAPI → python3 api.py  |  POST /booster/compute")
     _divider()
 
     with open("booster_output_sample.json", "w") as f:
         json.dump(asdict(out1), f, indent=2, default=str)
-    print(f"\n  Sample JSON â†’ booster_output_sample.json")
+    print(f"\n  Sample JSON → booster_output_sample.json")
 
 
 if __name__ == "__main__":
