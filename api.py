@@ -261,7 +261,13 @@ def dashboard():
 # HEALTH
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/booster/health")
+# NOTE: registered for both GET and HEAD. UptimeRobot's free tier only sends
+# HEAD requests, and a HEAD-only monitor against a GET-only route 405s —
+# which UptimeRobot correctly reports as "down" even though the service is
+# fine. Accepting HEAD here fixes both the false "down" alert AND lets this
+# monitor actually function as a Render keep-alive ping (a 405 doesn't reset
+# Render's idle/spin-down timer the way a real 200 does).
+@app.api_route("/booster/health", methods=["GET", "HEAD"])
 def health():
     if _engine is None:
         raise HTTPException(503, detail="Engine not initialised")
