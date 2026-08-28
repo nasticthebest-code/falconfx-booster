@@ -741,6 +741,31 @@ class GridEngine:
     def __init__(self, places_path: str = "places.json"):
         self.cells: dict[tuple, GridCell] = {}
         self._load(places_path)
+        self._local_peers_4km: dict = {}
+        self._build_local_peer_cache()
+
+    def _build_local_peer_cache(self):
+        """Precompute, ONCE, which cells fall within 4km of each cell.
+        This geometry is static — only demand_score changes per request —
+        so the two per-request bucket/haversine scans in inject_signals
+        (local-max normalize + local-hotspot percentile) can both read
+        from this instead of recomputing it every single call."""
+        SUPER_CELL_DEG = 0.01
+        RADIUS_KM = 4.0
+        all_cells = list(self.cells.values())
+        buckets: dict = defaultdict(list)
+        for cell in all_cells:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            buckets[bkey].append(cell)
+        for cell in all_cells:
+            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
+            peers = []
+            for dlat in (-1, 0, 1):
+                for dlng in (-1, 0, 1):
+                    for peer in buckets.get((bkey[0] + dlat, bkey[1] + dlng), ()):
+                        if haversine_km(cell.grid_lat, cell.grid_lng, peer.grid_lat, peer.grid_lng) <= RADIUS_KM:
+                            peers.append(peer)
+            self._local_peers_4km[(cell.grid_lat, cell.grid_lng)] = peers
 
     def _load(self, path: str):
         with open(path, "r", encoding="utf-8") as f:
@@ -1196,19 +1221,9 @@ class DemandSimulator:
         NORMALIZE_RADIUS_KM = 4.0
 
         all_cells_pre = list(self.grid.cells.values())
-        norm_buckets: dict = defaultdict(list)
-        for cell in all_cells_pre:
-            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
-            norm_buckets[bkey].append(cell)
 
         for cell in all_cells_pre:
-            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
-            local_peers = []
-            for dlat in (-1, 0, 1):
-                for dlng in (-1, 0, 1):
-                    for peer in norm_buckets.get((bkey[0] + dlat, bkey[1] + dlng), ()):
-                        if haversine_km(cell.grid_lat, cell.grid_lng, peer.grid_lat, peer.grid_lng) <= NORMALIZE_RADIUS_KM:
-                            local_peers.append(peer)
+            local_peers = self.grid._local_peers_4km.get((cell.grid_lat, cell.grid_lng), ())
             local_max = max((p.demand_score for p in local_peers), default=0) or 1
             cell.demand_score = min(100.0, (cell.demand_score / local_max) * 100.0)
             cell.surge_probability = min(1.0, cell.demand_score / 100.0)
@@ -1271,25 +1286,12 @@ class DemandSimulator:
         # neighbors. This is the caching approach flagged as necessary in
         # the original patch notes, implemented rather than deferred,
         # since 27k places puts us in that regime today, not hypothetically.
-        LOCAL_HOTSPOT_RADIUS_KM = 4.0
         LOCAL_HOTSPOT_PERCENTILE = 0.90  # top 10% within the local area
-        SUPER_CELL_DEG = 0.01  # ~1.1km at Accra's latitude — coarser bucket than GRID_RESOLUTION
 
         all_cells = list(self.grid.cells.values())
-        buckets: dict = defaultdict(list)
-        for cell in all_cells:
-            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
-            buckets[bkey].append(cell)
 
         for cell in all_cells:
-            bkey = (round(cell.grid_lat / SUPER_CELL_DEG), round(cell.grid_lng / SUPER_CELL_DEG))
-            local_peers = []
-            for dlat in (-1, 0, 1):
-                for dlng in (-1, 0, 1):
-                    neighbor_key = (bkey[0] + dlat, bkey[1] + dlng)
-                    for peer in buckets.get(neighbor_key, ()):
-                        if haversine_km(cell.grid_lat, cell.grid_lng, peer.grid_lat, peer.grid_lng) <= LOCAL_HOTSPOT_RADIUS_KM:
-                            local_peers.append(peer)
+            local_peers = self.grid._local_peers_4km.get((cell.grid_lat, cell.grid_lng), ())
 
             local_scores = sorted(c.demand_score for c in local_peers)
             if not local_scores:
