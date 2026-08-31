@@ -34,6 +34,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from booster import BoosterEngine, RiderTelemetry, GRID_RESOLUTION, PREDICTIVE_OFFSET_MINS
+from weather_engine import weather_engine
+from traffic_engine import traffic_engine, nearest_corridor, CORRIDORS
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -54,6 +56,22 @@ _runtime_config: dict = {
         "fuel_cost_per_km":          1.80,
         "search_radius_km":          5.0,
         "ghost_multiplier":          0.25,
+    },
+    "weather": {
+        "enabled":                  True,
+        "demand_multiplier_max":    1.30,
+        "speed_factor_min":         0.75,
+        "stale_after_minutes":      20,
+        "api_timeout_seconds":      5,
+    },
+    "traffic": {
+        "enabled":                  True,
+        "tse_base_url":             "",   # set once TSE is deployed, e.g. "https://falconfx-tse.onrender.com"
+        "stale_after_minutes":      5,    # traffic goes stale faster than weather — it changes quickly
+        "api_timeout_seconds":      5,
+        "queue_pressure_trigger":   0.60, # Effect 2: corridor must be this congested before displacement fires
+        "displacement_boost_mult":  1.4,
+        "displacement_radius_km":   1.0,
     },
 }
 
@@ -189,9 +207,29 @@ class RuntimeParams(BaseModel):
     ghost_multiplier:          Optional[float] = None
 
 
+class RuntimeWeather(BaseModel):
+    enabled:               Optional[bool]  = None
+    demand_multiplier_max: Optional[float] = None
+    speed_factor_min:      Optional[float] = None
+    stale_after_minutes:   Optional[int]   = None
+    api_timeout_seconds:   Optional[int]   = None
+
+
+class RuntimeTraffic(BaseModel):
+    enabled:                 Optional[bool]  = None
+    tse_base_url:             Optional[str]   = None
+    stale_after_minutes:      Optional[int]   = None
+    api_timeout_seconds:      Optional[int]   = None
+    queue_pressure_trigger:   Optional[float] = None
+    displacement_boost_mult:  Optional[float] = None
+    displacement_radius_km:   Optional[float] = None
+
+
 class ConfigUpdateRequest(BaseModel):
-    guards: Optional[RuntimeGuards] = None
-    params: Optional[RuntimeParams] = None
+    guards:  Optional[RuntimeGuards]  = None
+    params:  Optional[RuntimeParams]  = None
+    weather: Optional[RuntimeWeather] = None
+    traffic: Optional[RuntimeTraffic] = None
 
 
 class IngestRequest(BaseModel):
@@ -310,6 +348,50 @@ def shadow_active(hour: Optional[int] = None, minute: Optional[int] = None):
     return {"hour": h, "minute": m, "active_windows": active, "count": len(active)}
 
 
+@app.get("/booster/weather")
+def weather_status():
+    """Returns the current cached weather signal directly, for verifying the
+    live fetch without needing a full rider /booster/compute call."""
+    signal = weather_engine.get_signal(_runtime_config["weather"])
+    return {
+        "enabled":       _runtime_config["weather"]["enabled"],
+        "condition":     signal.condition,
+        "rain_mm":       signal.rain_mm,
+        "demand_mult":   signal.demand_mult,
+        "speed_factor":  signal.speed_factor,
+        "is_stale":      signal.is_stale,
+        "fetched_at":    (
+            datetime.datetime.utcfromtimestamp(signal.fetched_at).isoformat() + "Z"
+            if signal.fetched_at else None
+        ),
+        "would_trigger_flood_zones": _engine.demand.auto_rain_active_zones() if _engine else [],
+    }
+
+
+@app.get("/booster/traffic")
+def traffic_status():
+    """Returns every currently-cached corridor signal directly, for
+    verifying TSE connectivity without a full rider /booster/compute call.
+    Corridors with no entry haven't been queried yet — a corridor only
+    gets fetched once some rider's position falls within its radius."""
+    cfg = _runtime_config["traffic"]
+    cached = traffic_engine.get_all_cached_signals(cfg)
+    return {
+        "enabled":       cfg["enabled"],
+        "tse_base_url":  cfg["tse_base_url"] or "(not set — falls back to neutral)",
+        "corridors":     list(CORRIDORS.keys()),
+        "cached_signals": {
+            cid: {
+                "queue_pressure":        sig.queue_pressure,
+                "speed_ratio":           sig.speed_ratio,
+                "flow_direction":        sig.flow_direction,
+                "spillover_probability": sig.spillover_probability,
+                "is_stale":              sig.is_stale,
+            } for cid, sig in cached.items()
+        },
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPUTE  (main endpoint — External Positioning Overlay)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -349,15 +431,33 @@ def compute(req: ComputeRequest):
     # Pull telemetry weight overrides for current hour slot
     cell_overrides = _build_cell_weight_overrides(hour)
 
+    # Cached weather signal — does NOT trigger a live fetch on every request.
+    # weather_engine only re-fetches once its cache passes stale_after_minutes.
+    signal = weather_engine.get_signal(_runtime_config["weather"])
+
+    # Effect 1 (mobility): rider's nearest corridor, if any.
+    # Effect 2 (displacement): needs ALL cached corridors, since a jam
+    # elsewhere can still displace demand toward cells this rider could be
+    # routed to. get_all_cached_signals() triggers no new fetches itself —
+    # it just reads whatever's already been fetched for corridors other
+    # riders have been near recently.
+    traffic_cfg = _runtime_config["traffic"]
+    rider_traffic = traffic_engine.get_signal_for_rider(req.rider.lat, req.rider.lng, traffic_cfg)
+    all_traffic = traffic_engine.get_all_cached_signals(traffic_cfg)
+
     result = _engine.compute(
         rider=rider,
         hour=hour,
         minute=minute,
         search_radius_km=radius,
         simulate_hotspots=spikes or None,
-        rain_active_zones=req.rain_active_zones,
+        rain_active_zones=req.rain_active_zones or None,
         weekday=weekday,
         cell_weight_overrides=cell_overrides,
+        weather_signal=signal,
+        rider_traffic_signal=rider_traffic,
+        all_traffic_signals=all_traffic,
+        traffic_config=traffic_cfg,
     )
 
     output = asdict(result)
@@ -621,10 +721,16 @@ def update_config(req: ConfigUpdateRequest):
         _runtime_config["guards"].update(req.guards.model_dump(exclude_none=True))
     if req.params:
         _runtime_config["params"].update(req.params.model_dump(exclude_none=True))
+    if req.weather:
+        _runtime_config["weather"].update(req.weather.model_dump(exclude_none=True))
+    if req.traffic:
+        _runtime_config["traffic"].update(req.traffic.model_dump(exclude_none=True))
     return {
         "status":    "applied",
         "guards":    _runtime_config["guards"],
         "params":    _runtime_config["params"],
+        "weather":   _runtime_config["weather"],
+        "traffic":   _runtime_config["traffic"],
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
     }
 
