@@ -30,6 +30,9 @@ import math
 import random
 import re
 import datetime
+
+from weather_engine import WeatherSignal
+from traffic_engine import TrafficSignal, CORRIDORS, nearest_corridor
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from typing import Optional
@@ -639,7 +642,10 @@ class BoosterOutput:
     leapfrog_vector: Optional[dict]
     arbitrage_alert: Optional[dict]
     waybill_alert: Optional[dict]
-    weather_advisory: Optional[dict]
+    weather_advisory: Optional[dict]        # MonsoonLayer dry-edge flood alert
+    weather_signal: Optional[dict]          # raw weather signal for RoadBot to explain
+    traffic_signal: Optional[dict]          # raw traffic signal (rider's nearest corridor)
+    traffic_displacement: Optional[dict]    # Effect 2 advisory, mirrors weather_advisory
     corporate_arbitrage: Optional[dict]     # v4.0 — corporate landing zone routing
     grid_stats: dict
     next_poll_interval_seconds: int
@@ -864,6 +870,22 @@ class TrafficFriction:
         self.road_quality_zones = ROAD_QUALITY_ZONES
         self.corridors = ACCRA_TRAFFIC_CONSTRAINTS
         self.ped_zones = PEDESTRIAN_CONGESTION_ZONES
+        self._weather_speed_factor = 1.0   # set once per compute() via set_weather()
+        self._traffic_speed_factor = 1.0   # set once per compute() via set_traffic()
+
+    def set_weather(self, signal: Optional[WeatherSignal]) -> None:
+        """Called once at the top of BoosterEngine.compute(). Mobility-only —
+        weather's DEMAND effect lives in DemandSimulator.set_weather(), not here."""
+        self._weather_speed_factor = signal.speed_factor if signal else 1.0
+
+    def set_traffic(self, signal: Optional["TrafficSignal"]) -> None:
+        """Called once at the top of BoosterEngine.compute(). Uses TSE's own
+        speed_ratio directly (current_speed/free_flow_speed) rather than
+        re-deriving a new formula from queue_pressure — TSE already computed
+        the number that means exactly what we need here. Mobility-only —
+        traffic's DEMAND effect (displacement) lives in
+        TrafficDisplacementLayer, not here."""
+        self._traffic_speed_factor = signal.speed_ratio if (signal and not signal.is_stale) else 1.0
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -1036,7 +1058,9 @@ class TrafficFriction:
     def effective_speed(self, rider: RiderTelemetry, hour: int,
                         minute: int = 0) -> float:
         base = max(rider.speed_kmh, 15.0)
-        return base * self.speed_multiplier(rider.lat, rider.lng, hour, minute)
+        return (base * self.speed_multiplier(rider.lat, rider.lng, hour, minute)
+                * self._weather_speed_factor
+                * self._traffic_speed_factor)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1061,13 +1085,35 @@ class DemandSimulator:
         18: 1.7, 19: 1.8, 20: 1.5, 21: 1.2, 22: 0.8, 23: 0.5,
     }
 
+    # Rain intensity (mm) at/above this auto-populates rain_active_zones for
+    # MonsoonLayer. v1 uses one city-wide reading, so this triggers ALL
+    # RAIN_FLOOD_ZONES rather than picking specific ones — known v1
+    # simplification, fine until per-zone rain data exists.
+    FLOOD_TRIGGER_MM = 5.0
+
     def __init__(self, grid: GridEngine, seed: int = None):
         self.grid = grid
         self.shadow_matrix = SHADOW_MATRIX
         self.b2b_zones = B2B_WHOLESALE_ZONES
         self.megachurch_zones = MEGACHURCH_EVENT_ZONES
+        self._weather_demand_mult = 1.0
+        self._weather_signal: Optional[WeatherSignal] = None
         if seed is not None:
             random.seed(seed)
+
+    def set_weather(self, signal: Optional[WeatherSignal]) -> None:
+        """Called once at the top of BoosterEngine.compute(). Demand-only —
+        weather's MOBILITY effect lives in TrafficFriction.set_weather(), not here."""
+        self._weather_signal = signal
+        self._weather_demand_mult = signal.demand_mult if signal else 1.0
+
+    def auto_rain_active_zones(self) -> list:
+        """Derives active RAIN_FLOOD_ZONES from live weather. Only used when
+        the client didn't supply an explicit rain_active_zones override."""
+        sig = self._weather_signal
+        if not sig or sig.is_stale or sig.rain_mm < self.FLOOD_TRIGGER_MM:
+            return []
+        return [zname for zname, *_ in RAIN_FLOOD_ZONES]
 
     def _time_multiplier(self, hour: int) -> float:
         return self.HOUR_CURVE.get(hour, 0.3)
@@ -1198,7 +1244,10 @@ class DemandSimulator:
         # ── Base scoring
         for cell in self.grid.cells.values():
             noise = random.uniform(0.7, 1.3)
-            cell.demand_score = cell.base_weight * time_mult * noise
+            cell.demand_score = min(
+                100.0,
+                cell.base_weight * time_mult * self._weather_demand_mult * noise,
+            )
             cell.prep_buffer_min = self._prep_buffer(cell)
             cell.is_hotspot = False
             cell.checkout_eta_min = None
@@ -1826,6 +1875,76 @@ class MonsoonLayer:
         }
 
 
+class TrafficDisplacementLayer:
+    """
+    Mirrors MonsoonLayer exactly, same mechanism: mutate demand_score for
+    affected cells IN PLACE, return an advisory dict summarizing the best one.
+
+    The trigger here is different — instead of a flooded zone's core, it's
+    a corridor whose live queue_pressure (from TSE) has crossed a threshold.
+    The reasoning is the same shape as Monsoon's dry-edge effect: when a
+    corridor jams hard enough, people in cars/trotros stuck in it switch to
+    a bike — but they switch AT THE EDGES of the jam (junctions, stops),
+    not in the middle of stopped traffic. So cells near a congested
+    corridor's own monitor points get boosted, not the corridor itself.
+
+    This is Effect 2 (displacement DEMAND) — kept entirely separate from
+    Effect 1 (mobility SPEED, in TrafficFriction.set_traffic()). A jammed
+    road doesn't make Booster think the destination is more wanted city-
+    wide; it makes Booster think a few specific edge cells near that jam
+    are picking up stranded-passenger demand right now.
+    """
+
+    def __init__(self, grid: GridEngine):
+        self.grid = grid
+
+    def apply(self, rider: RiderTelemetry, traffic_signals: dict,
+              config: dict) -> Optional[dict]:
+        if not traffic_signals:
+            return None
+
+        trigger = config.get("queue_pressure_trigger", 0.60)
+        boost_mult = config.get("displacement_boost_mult", 1.4)
+        edge_radius_km = config.get("displacement_radius_km", 1.0)
+
+        congested = [
+            (cid, sig) for cid, sig in traffic_signals.items()
+            if sig and not sig.is_stale and sig.queue_pressure >= trigger
+        ]
+        if not congested:
+            return None
+
+        boosted_cells = []
+        for cid, sig in congested:
+            corridor = CORRIDORS.get(cid)
+            if not corridor:
+                continue
+            for plat, plng in corridor["points"]:
+                for cell in self.grid.nearby_cells(plat, plng, edge_radius_km):
+                    cell.demand_score = min(100.0, cell.demand_score * boost_mult)
+                    boosted_cells.append(cell)
+
+        if not boosted_cells:
+            return None
+
+        best = max(boosted_cells, key=lambda c: c.demand_score)
+        dist = haversine_km(rider.lat, rider.lng, best.grid_lat, best.grid_lng)
+        bear = bearing_deg(rider.lat, rider.lng, best.grid_lat, best.grid_lng)
+        congested_ids = [cid for cid, _ in congested]
+        return {
+            "alert": "TRAFFIC_DISPLACEMENT",
+            "congested_corridors": congested_ids,
+            "edge_lat": best.grid_lat,
+            "edge_lng": best.grid_lng,
+            "distance_km": round(dist, 2),
+            "bearing_deg": round(bear, 1),
+            "demand_score": round(best.demand_score, 1),
+            "message": (f"Heavy traffic on {', '.join(congested_ids)}. "
+                        f"Stranded car/trotro passengers likely switching to "
+                        f"bikes near {dist:.1f}km {compass_label(bear)}."),
+        }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 12 — PREDICTIVE HOLD STATE MACHINE
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1937,6 +2056,7 @@ class BoosterEngine:
         self.corp_arb  = CorporateArbitrageRouter()
         self.waybill   = WaybillInterceptor()
         self.monsoon   = MonsoonLayer(self.grid)
+        self.traffic_displacement = TrafficDisplacementLayer(self.grid)
         self.hold_sm   = PredictiveHoldSM()
         self.poller    = AdaptivePoller()
         print("  Engine ready. [Cash Cow Guard | Ghost Penalty | Mega-Church Waves | Corp Arbitrage]\n")
@@ -1949,13 +2069,32 @@ class BoosterEngine:
                 simulate_hotspots=None,
                 rain_active_zones=None,
                 weekday: int = None,
-                cell_weight_overrides: dict = None) -> BoosterOutput:
+                cell_weight_overrides: dict = None,
+                weather_signal: Optional[WeatherSignal] = None,
+                rider_traffic_signal: Optional[TrafficSignal] = None,
+                all_traffic_signals: dict = None,
+                traffic_config: dict = None) -> BoosterOutput:
 
         ts = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
         # Infer weekday if not supplied
         if weekday is None:
             weekday = datetime.datetime.now().weekday()  # 0=Mon…6=Sun
+
+        # ── Weather + Traffic: signal-generator pattern, set once here.
+        #    demand_mult only touches DemandSimulator, speed_factor/
+        #    speed_ratio only touch TrafficFriction — same slot, both
+        #    multiply in independently. Displacement (Effect 2, traffic
+        #    creating demand at jam edges) is applied separately below,
+        #    next to Monsoon — never folded into this demand multiplier.
+        self.friction.set_weather(weather_signal)
+        self.demand.set_weather(weather_signal)
+        self.friction.set_traffic(rider_traffic_signal)
+
+        # rain_active_zones stays a manual override for testing — only
+        # auto-derived from live weather when caller left it unset.
+        if rain_active_zones is None:
+            rain_active_zones = self.demand.auto_rain_active_zones()
 
         # ── 0. Predictive front-runner: advance wall-clock by PREDICTIVE_OFFSET_MINS
         #    Demand signals are scored against WHERE THE MARKET WILL BE, not where it is.
@@ -2112,6 +2251,32 @@ class BoosterEngine:
         # ── 10. Monsoon layer
         weather_advisory = self.monsoon.apply(rider, rain_active_zones or [], hour)
 
+        weather_signal_out = None
+        if weather_signal is not None:
+            weather_signal_out = {
+                "condition":    weather_signal.condition,
+                "rain_mm":      weather_signal.rain_mm,
+                "demand_mult":  weather_signal.demand_mult,
+                "speed_factor": weather_signal.speed_factor,
+                "is_stale":     weather_signal.is_stale,
+            }
+
+        # ── 10.5. Traffic displacement (Effect 2 — DEMAND, mirrors Monsoon)
+        traffic_displacement = self.traffic_displacement.apply(
+            rider, all_traffic_signals or {}, traffic_config or {}
+        )
+
+        traffic_signal_out = None
+        if rider_traffic_signal is not None:
+            traffic_signal_out = {
+                "corridor_id":            rider_traffic_signal.corridor_id,
+                "queue_pressure":         rider_traffic_signal.queue_pressure,
+                "speed_ratio":            rider_traffic_signal.speed_ratio,
+                "flow_direction":         rider_traffic_signal.flow_direction,
+                "spillover_probability":  rider_traffic_signal.spillover_probability,
+                "is_stale":               rider_traffic_signal.is_stale,
+            }
+
         # ── 11. Adaptive poll interval
         poll_interval = self.poller.compute(rider, hold, primary_vector)
 
@@ -2181,6 +2346,9 @@ class BoosterEngine:
             arbitrage_alert=arb_alert,
             waybill_alert=waybill_alert,
             weather_advisory=weather_advisory,
+            weather_signal=weather_signal_out,
+            traffic_signal=traffic_signal_out,
+            traffic_displacement=traffic_displacement,
             corporate_arbitrage=corp_arb_alert,
             grid_stats=grid_stats,
             next_poll_interval_seconds=poll_interval,
