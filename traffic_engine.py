@@ -39,15 +39,17 @@ from typing import Optional
 
 # Mirrors app/config.py CORRIDORS in the TSE repo exactly. Kept in sync by
 # hand — if a corridor is added/changed in TSE, update it here too.
+# Last synced 2026-08-31 against TSE commit 3ccba72 (post TomTom
+# "point too far from nearest existing segment" coordinate fix).
 CORRIDORS: dict = {
-    "N1":       {"points": ((5.5350, -0.4160), (5.5680, -0.2350), (5.6030, -0.2050)), "radius_km": 3.0},
-    "Spintex":  {"points": ((5.6050, -0.1650), (5.5890, -0.1460), (5.5680, -0.1270)), "radius_km": 2.5},
-    "Legon":    {"points": ((5.6400, -0.2050), (5.6500, -0.1870), (5.6810, -0.1900)), "radius_km": 2.5},
-    "Madina":   {"points": ((5.6810, -0.1900), (5.6920, -0.1660), (5.7050, -0.1530)), "radius_km": 2.5},
-    "Airport":  {"points": ((5.6050, -0.1710), (5.6000, -0.1880), (5.5910, -0.2020)), "radius_km": 2.5},
-    "Circle":   {"points": ((5.5500, -0.2050), (5.5600, -0.2050), (5.5750, -0.1980)), "radius_km": 2.5},
-    "Lapaz":    {"points": ((5.6220, -0.2510), (5.6350, -0.2460), (5.6480, -0.2370)), "radius_km": 2.5},
-    "Achimota": {"points": ((5.6330, -0.2430), (5.6550, -0.2350), (5.6750, -0.2250)), "radius_km": 2.5},
+    "N1":       {"points": ((5.5950, -0.2350), (5.6130, -0.2280), (5.6250, -0.2100)), "radius_km": 3.0},
+    "Spintex":  {"points": ((5.6020, -0.1500), (5.6150, -0.1250), (5.6230, -0.1050)), "radius_km": 2.5},
+    "Legon":    {"points": ((5.6320, -0.1780), (5.6500, -0.1750), (5.6700, -0.1700)), "radius_km": 2.5},
+    "Madina":   {"points": ((5.6650, -0.1680), (5.6800, -0.1650), (5.6950, -0.1600)), "radius_km": 2.5},
+    "Airport":  {"points": ((5.5800, -0.1750), (5.5900, -0.1800), (5.5700, -0.1700)), "radius_km": 2.5},
+    "Circle":   {"points": ((5.5580, -0.2150), (5.5520, -0.2200), (5.5650, -0.2100)), "radius_km": 2.5},
+    "Lapaz":    {"points": ((5.5920, -0.2400), (5.5980, -0.2480), (5.5880, -0.2300)), "radius_km": 2.5},
+    "Achimota": {"points": ((5.6050, -0.2200), (5.6127, -0.2343), (5.6280, -0.2450)), "radius_km": 2.5},
 }
 
 
